@@ -126,7 +126,7 @@ export const dictSense = pgTable(
 		/** Sense-level details from the source (register, case, preposition, raw tags). */
 		details: jsonb('details').notNull().default({})
 	},
-	(t) => [index('dict_sense_word_idx').on(t.dictWordId)]
+	(t) => [uniqueIndex('dict_sense_word_position_idx').on(t.dictWordId, t.position)]
 );
 
 /** Inflected forms, so that "fuhr" finds "fahren". */
@@ -146,19 +146,34 @@ export const dictForm = pgTable(
 	(t) => [index('dict_form_form_idx').on(sql`lower(${t.form})`)]
 );
 
+/**
+ * Example sentences. Dictionary examples belong to a sense; Tatoeba sentences can't be
+ * tied to one sense, so they belong to the word only.
+ */
 export const dictExample = pgTable(
 	'dict_example',
 	{
 		id: serial('id').primaryKey(),
-		dictSenseId: integer('dict_sense_id')
+		dictWordId: integer('dict_word_id')
 			.notNull()
-			.references(() => dictSense.id, { onDelete: 'cascade' }),
+			.references(() => dictWord.id, { onDelete: 'cascade' }),
+		dictSenseId: integer('dict_sense_id').references(() => dictSense.id, { onDelete: 'cascade' }),
 		german: text('german').notNull(),
 		english: text('english'),
 		source: exampleSource('source').notNull()
 	},
-	(t) => [index('dict_example_sense_idx').on(t.dictSenseId)]
+	(t) => [
+		index('dict_example_word_idx').on(t.dictWordId),
+		index('dict_example_sense_idx').on(t.dictSenseId)
+	]
 );
+
+/** Key/value facts about the shared data, e.g. which word-bank build is loaded. */
+export const dictMeta = pgTable('dict_meta', {
+	key: text('key').primaryKey(),
+	value: text('value').notNull(),
+	updatedAt: updatedAt()
+});
 
 /** Reference data: each prefix's meanings are prefix-meaning groups. */
 export const prefix = pgTable('prefix', {

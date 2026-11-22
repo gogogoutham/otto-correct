@@ -1,0 +1,26 @@
+{
+	"builtAt": "2026-11-22T18:11:12.362Z",
+	"lemmas": 10000,
+	"entries": 10740,
+	"frequencyTokensUsed": 24705,
+	"byPartOfSpeech": {
+		"conjunction": 68,
+		"verb": 3021,
+		"adverb": 766,
+		"noun": 4643,
+		"preposition": 96,
+		"particle": 15,
+		"adjective": 2130,
+		"expression": 1
+	},
+	"senses": 19916,
+	"forms": 306219,
+	"dictionaryExamples": 6915,
+	"tatoebaExamples": 29679,
+	"entriesWithoutAnyExample": 408,
+	"sources": {
+		"dictionary": "English Wiktionary via kaikki.org (wiktextract), CC BY-SA 4.0",
+		"frequency": "hermitdave/FrequencyWords, OpenSubtitles 2018 German top 50k, CC BY-SA 4.0",
+		"sentences": "Tatoeba (tatoeba.org), CC BY 2.0 FR"
+	}
+}
