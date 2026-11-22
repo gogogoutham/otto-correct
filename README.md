@@ -34,7 +34,7 @@ Edit `src/lib/server/db/schema.ts`, then run `npm run db:generate` and commit th
 2. **Neon:** in the Vercel project, open **Storage → Create Database → Neon** (or connect an existing Neon project). This adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED` to the project's environment variables.
 3. **Environment variables** (Vercel → Settings → Environment Variables, Production):
    - `ADMIN_USERNAME` and `ADMIN_PASSWORD`: your first login.
-4. **Deploy.** Production builds run `npm run db:migrate` first; preview builds skip migrations so unmerged branches never change the database.
+4. **Deploy.** Production and preview builds run `npm run db:migrate` first. Each preview deployment has its own Neon branch, so a preview migrates only its own copy of the database; this relies on the Neon integration's Preview branch option being on.
 5. Log in at the production URL, then delete `ADMIN_PASSWORD` from Vercel.
 
 ## Data and licences
