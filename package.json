@@ -22,7 +22,10 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "node scripts/migrate.js",
 		"db:studio": "drizzle-kit studio",
-		"vercel-build": "node scripts/migrate.js && vite build"
+		"vercel-build": "node scripts/migrate.js && tsx scripts/wordbank/load.ts && vite build",
+		"wordbank:download": "scripts/wordbank/download.sh",
+		"wordbank:build": "tsx scripts/wordbank/build.ts",
+		"wordbank:load": "tsx scripts/wordbank/load.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -44,6 +47,7 @@
 		"svelte": "^5.57.3",
 		"svelte-check": "^4.7.8",
 		"tailwindcss": "^4.3.5",
+		"tsx": "^4.23.15",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.72.2",
 		"vite": "^8.3.8",

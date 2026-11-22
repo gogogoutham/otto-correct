@@ -31,6 +31,8 @@ jobs:
       - run: npm test
       - name: Migrations apply cleanly
         run: npm run db:migrate
+      - name: Word bank loads
+        run: npm run wordbank:load
       - name: Schema matches migrations
         run: |
           npx drizzle-kit generate
