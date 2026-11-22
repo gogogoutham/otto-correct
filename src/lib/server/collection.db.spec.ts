@@ -20,6 +20,7 @@ import { fakeKaikki } from './dictionary/fixtures/fake-kaikki.js';
 import { lookupGerman } from './dictionary/lookup.js';
 import type { Db } from './dictionary/store.js';
 import { search } from './search.js';
+import { getCard, practiceQueue } from './cards.js';
 
 const url = process.env.DATABASE_URL;
 
@@ -175,6 +176,10 @@ describe.skipIf(!url)('collection (database)', () => {
 			expect(page.homographs.collection.map((h) => h.id)).toEqual([manual]);
 			expect(page.homographs.dictionary.map((h) => h.id)).toContain(bankIds[1]);
 			expect(page.homographs.dictionary.map((h) => h.id)).not.toContain(bankIds[0]);
+			// Each homograph carries its own first gloss.
+			const other = page.homographs.dictionary.find((h) => h.id === bankIds[1]);
+			expect(other?.firstGloss).toMatch(/bank/);
+			expect(page.homographs.collection[0].firstGloss).toBe('made-up homograph');
 		});
 
 		it("never shows another user's words", async () => {
@@ -187,6 +192,30 @@ describe.skipIf(!url)('collection (database)', () => {
 			} finally {
 				await db.delete(table.user).where(eq(table.user.id, other.id));
 			}
+		});
+	});
+
+	describe('cards', () => {
+		it('builds a card with other meanings, unseen senses and homographs', async () => {
+			const [{ id: meaningId }] = await db
+				.select({ id: table.meaning.id })
+				.from(table.meaning)
+				.innerJoin(table.word, eq(table.word.id, table.meaning.wordId))
+				.where(and(eq(table.meaning.userId, userId), eq(table.word.dictWordId, bankIds[0])));
+			const card = await getCard(db, userId, meaningId);
+			expect(card.back.title).toBe('die Bank');
+			expect(card.back.lines).toContainEqual({ label: 'Plural', value: 'die Bänke' });
+			expect(card.homographs.map((h) => h.title)).toEqual(['bank', 'die Bank']);
+			expect(card.others.every((o) => o.status === 'not_in_deck')).toBe(true);
+		});
+
+		it('builds the practice queue from studying meanings, filtered by tag and part of speech', async () => {
+			const all = await practiceQueue(db, userId, { tags: [], pos: null });
+			const travel = await practiceQueue(db, userId, { tags: ['travel'], pos: null });
+			const nouns = await practiceQueue(db, userId, { tags: [], pos: 'noun' });
+			expect(travel.length).toBe(2);
+			expect(all.length).toBeGreaterThan(travel.length);
+			expect(nouns).toHaveLength(1);
 		});
 	});
 });

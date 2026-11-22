@@ -5,7 +5,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import { grammarSummary, meaningGrammarSummary } from '#lib/grammar.js';
+	import { meaningUsage } from '#lib/card-back.js';
+	import { grammarSummary } from '#lib/grammar.js';
 	import type { DictionaryHit } from '#lib/server/search.js';
 	import PosLabel from './PosLabel.svelte';
 
@@ -56,7 +57,7 @@
 		<input type="hidden" name="dictWordId" value={hit.id} />
 		<ol class="flex flex-col divide-y divide-stone-100">
 			{#each hit.senses as sense, i (sense.id)}
-				{@const extra = meaningGrammarSummary(sense.details)}
+				{@const extra = meaningUsage(sense.details).join(' · ')}
 				<li class="flex flex-col gap-2 py-2 sm:flex-row sm:items-start sm:justify-between">
 					<div class="min-w-0 {sense.inCollection ? 'text-stone-400' : ''}">
 						<p>

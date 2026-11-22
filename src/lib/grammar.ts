@@ -142,16 +142,37 @@ export const GRAMMAR_FIELDS: Record<PartOfSpeech, GrammarField[]> = {
 		{ key: 'twoWay', label: 'Two-way (Wechselpräposition)', kind: { type: 'bool' } },
 		{ key: 'contractions', label: 'Contractions', kind: { type: 'list' }, german: true }
 	],
-	conjunction: [],
+	conjunction: [
+		{
+			key: 'wordOrder',
+			label: 'Word order',
+			kind: {
+				type: 'choice',
+				options: [
+					{ value: 'coordinating', label: 'coordinating (und, aber)' },
+					{ value: 'subordinating', label: 'verb at the end (weil, dass)' },
+					{ value: 'adverbial', label: 'verb next (deshalb, trotzdem)' }
+				]
+			}
+		}
+	],
 	particle: [],
 	expression: []
 };
 
-/** Meaning-level fields, the same for every part of speech. */
-export const MEANING_FIELDS: GrammarField[] = [
-	{ key: 'objectCases', label: 'Object case', kind: { type: 'multi', options: CASES } },
-	{ key: 'reflexive', label: 'Reflexive', kind: { type: 'bool' } }
-];
+/** Meaning-level fields that can be edited, by part of speech. */
+export function meaningFields(pos: PartOfSpeech): GrammarField[] {
+	if (pos === 'verb')
+		return [
+			{ key: 'reflexive', label: 'Reflexive (sich)', kind: { type: 'bool' } },
+			{ key: 'objectCases', label: 'Object case', kind: { type: 'multi', options: CASES } }
+		];
+	if (pos === 'preposition')
+		return [
+			{ key: 'governs', label: 'Case in this meaning', kind: { type: 'multi', options: CASES } }
+		];
+	return [];
+}
 
 /** Reads a grammar edit form. Empty fields come back as `undefined`, meaning "remove". */
 export function grammarFromForm(fields: GrammarField[], form: FormData, prefix = ''): Grammar {
@@ -250,15 +271,4 @@ export function grammarSummary(pos: PartOfSpeech, g: Grammar): string {
 		default:
 			return '';
 	}
-}
-
-/** Meaning-level grammar as a short label, e.g. "+ dat · warten auf + acc · reflexive". */
-export function meaningGrammarSummary(g: Grammar): string {
-	const parts: string[] = [];
-	if (g.reflexive) parts.push('reflexive');
-	for (const c of list(g.objectCases)) parts.push(`+ ${c.slice(0, 3)}`);
-	for (const p of (g.prepositionalObjects as { preposition: string; case?: string }[]) ?? [])
-		parts.push(`${p.preposition}${p.case ? ` + ${p.case.slice(0, 3)}` : ''}`);
-	for (const r of list(g.register)) parts.push(r);
-	return parts.join(' · ');
 }

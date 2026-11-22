@@ -17,7 +17,7 @@ import {
 	type DeckStatus
 } from '#lib/server/collection.js';
 import { int, senseSelections, text, userId } from '#lib/server/forms.js';
-import { GRAMMAR_FIELDS, grammarFromForm, MEANING_FIELDS } from '#lib/grammar.js';
+import { GRAMMAR_FIELDS, grammarFromForm, meaningFields } from '#lib/grammar.js';
 import type { Actions, PageServerLoad } from './$types';
 
 const wordId = (id: string) => {
@@ -66,12 +66,13 @@ export const actions: Actions = {
 		return { saved: 'word' };
 	},
 
-	meaning: async ({ request, locals }) => {
+	meaning: async ({ request, locals, params }) => {
 		const uid = userId(locals);
 		const form = await request.formData();
 		const meaningId = int(form, 'meaningId');
+		const page = await guard(() => getWordPage(db, uid, wordId(params.id)));
 		const glosses = text(form, 'glosses')
-			.split(/[;\n]/)
+			.split('\n')
 			.map((g) => g.trim())
 			.filter(Boolean);
 		if (!glosses.length) return fail(400, { message: 'A meaning needs at least one translation.' });
@@ -79,7 +80,7 @@ export const actions: Actions = {
 			await updateMeaning(db, uid, meaningId, {
 				glosses,
 				contextLabel: text(form, 'contextLabel'),
-				grammar: grammarFromForm(MEANING_FIELDS, form, 'm-')
+				grammar: grammarFromForm(meaningFields(page.word.pos), form, 'm-')
 			});
 			await setMeaningTags(db, uid, meaningId, parseTagList(text(form, 'tags')));
 		});
