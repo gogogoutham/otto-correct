@@ -34,12 +34,15 @@ export async function findInDictionary(db: Db, term: string): Promise<DictWord[]
 	const byForm = db
 		.selectDistinct({ id: table.dictForm.dictWordId })
 		.from(table.dictForm)
-		.where(sql`lower(${table.dictForm.form}) = lower(${t})`);
+		.where(sql`de_fold(${table.dictForm.form}) = de_fold(${t})`);
 	return db
 		.select()
 		.from(table.dictWord)
 		.where(
-			or(sql`lower(${table.dictWord.headword}) = lower(${t})`, inArray(table.dictWord.id, byForm))
+			or(
+				sql`de_fold(${table.dictWord.headword}) = de_fold(${t})`,
+				inArray(table.dictWord.id, byForm)
+			)
 		)
 		.orderBy(sql`${table.dictWord.frequencyRank} nulls last`, table.dictWord.id);
 }

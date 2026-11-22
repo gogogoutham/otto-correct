@@ -66,6 +66,7 @@ export async function storeEntries(
 					dictWordId: wordIds[i],
 					position,
 					glosses: s.glosses,
+					glossSearch: s.glosses.join(' ').toLowerCase(),
 					details: s.details
 				}))
 			);
@@ -75,7 +76,11 @@ export async function storeEntries(
 						.values(senseRows)
 						.onConflictDoUpdate({
 							target: [table.dictSense.dictWordId, table.dictSense.position],
-							set: { glosses: sql`excluded.glosses`, details: sql`excluded.details` }
+							set: {
+								glosses: sql`excluded.glosses`,
+								glossSearch: sql`excluded.gloss_search`,
+								details: sql`excluded.details`
+							}
 						})
 						.returning({
 							id: table.dictSense.id,

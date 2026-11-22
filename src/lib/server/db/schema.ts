@@ -110,7 +110,7 @@ export const dictWord = pgTable(
 	},
 	(t) => [
 		index('dict_word_headword_idx').on(t.headword),
-		index('dict_word_headword_trgm_idx').using('gin', sql`lower(${t.headword}) gin_trgm_ops`)
+		index('dict_word_headword_trgm_idx').using('gin', sql`de_fold(${t.headword}) gin_trgm_ops`)
 	]
 );
 
@@ -123,10 +123,15 @@ export const dictSense = pgTable(
 			.references(() => dictWord.id, { onDelete: 'cascade' }),
 		position: smallint('position').notNull(),
 		glosses: text('glosses').array().notNull(),
+		/** Lowercased glosses, for English search. */
+		glossSearch: text('gloss_search').notNull().default(''),
 		/** Sense-level details from the source (register, case, preposition, raw tags). */
 		details: jsonb('details').notNull().default({})
 	},
-	(t) => [uniqueIndex('dict_sense_word_position_idx').on(t.dictWordId, t.position)]
+	(t) => [
+		uniqueIndex('dict_sense_word_position_idx').on(t.dictWordId, t.position),
+		index('dict_sense_gloss_trgm_idx').using('gin', sql`${t.glossSearch} gin_trgm_ops`)
+	]
 );
 
 /** Inflected forms, so that "fuhr" finds "fahren". */
@@ -143,7 +148,7 @@ export const dictForm = pgTable(
 			.notNull()
 			.default(sql`'{}'::text[]`)
 	},
-	(t) => [index('dict_form_form_idx').on(sql`lower(${t.form})`)]
+	(t) => [index('dict_form_form_idx').on(sql`de_fold(${t.form})`)]
 );
 
 /**
@@ -212,7 +217,10 @@ export const word = pgTable(
 	},
 	(t) => [
 		index('word_user_headword_idx').on(t.userId, t.headword),
-		index('word_headword_trgm_idx').using('gin', sql`lower(${t.headword}) gin_trgm_ops`)
+		index('word_headword_trgm_idx').using('gin', sql`de_fold(${t.headword}) gin_trgm_ops`),
+		uniqueIndex('word_user_dict_word_idx')
+			.on(t.userId, t.dictWordId)
+			.where(sql`${t.dictWordId} is not null`)
 	]
 );
 
