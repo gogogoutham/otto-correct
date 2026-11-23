@@ -434,6 +434,13 @@ function adverbBack(word: WordInput): CardBack {
 function prepositionBack(word: WordInput, meaningGrammar: Grammar): CardBack {
 	const g = word.grammar;
 	const back = plain(word.headword);
+	if (g.postposition === true) {
+		back.labels.push('postposition');
+		back.lines.push({
+			label: 'Position',
+			value: word.headword === 'nach' ? 'after its noun (meiner Meinung nach)' : 'after its noun'
+		});
+	}
 	// The meaning's own case wins (in + Dat = location); otherwise the word's.
 	const cases = list(meaningGrammar.governs).length
 		? list(meaningGrammar.governs)

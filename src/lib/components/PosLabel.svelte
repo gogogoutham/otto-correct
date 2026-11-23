@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { articles, type Grammar, type PartOfSpeech } from '#lib/grammar.js';
+	import { articles, posLabel, type Grammar, type PartOfSpeech } from '#lib/grammar.js';
 
 	let { headword, pos, grammar }: { headword: string; pos: PartOfSpeech; grammar: Grammar } =
 		$props();
@@ -9,4 +9,6 @@
 <span class="font-semibold">
 	{#if article}<span class="mr-1 font-normal text-stone-500">{article}</span>{/if}{headword}
 </span>
-<span class="ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600">{pos}</span>
+<span class="ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600">
+	{posLabel(pos, grammar)}
+</span>

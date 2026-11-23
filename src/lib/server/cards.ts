@@ -7,7 +7,7 @@ import * as table from './db/schema.js';
 import type { Db } from './dictionary/store.js';
 import { getWordPage, wordIdOfMeaning } from './collection.js';
 import { buildCardBack, cleanGloss, type CardBack } from '#lib/card-back.js';
-import type { Grammar, PartOfSpeech } from '#lib/grammar.js';
+import { posLabel, type Grammar, type PartOfSpeech } from '#lib/grammar.js';
 
 export type Direction = 'en_de' | 'de_en';
 export const parseDirection = (v: string | null): Direction => (v === 'de_en' ? 'de_en' : 'en_de');
@@ -33,6 +33,8 @@ export interface CardView {
 	wordId: number;
 	headword: string;
 	pos: PartOfSpeech;
+	/** The part of speech as shown, e.g. "postposition". */
+	posLabel: string;
 	flagged: boolean;
 	deckStatus: string;
 	glosses: string[];
@@ -59,6 +61,7 @@ export async function getCard(db: Db, userId: string, meaningId: number): Promis
 		wordId: page.word.id,
 		headword: page.word.headword,
 		pos: page.word.pos,
+		posLabel: posLabel(page.word.pos, word.grammar),
 		flagged: m.flagged ?? false,
 		deckStatus: m.deckStatus,
 		glosses: m.glosses.map(cleanGloss),

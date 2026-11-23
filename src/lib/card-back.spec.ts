@@ -290,3 +290,21 @@ describe('word summaries', () => {
 		expect(grammarSummary('conjunction', {}, 'denn')).toBe('normal word order');
 	});
 });
+
+describe('postpositions', () => {
+	it('labels a postposition and says it follows its noun', () => {
+		const b = buildCardBack(
+			{
+				headword: 'nach',
+				pos: 'preposition',
+				grammar: { postposition: true, governs: ['dative'] }
+			},
+			{}
+		);
+		expect(b.labels).toContain('postposition');
+		expect(b.lines).toContainEqual({
+			label: 'Position',
+			value: 'after its noun (meiner Meinung nach)'
+		});
+	});
+});

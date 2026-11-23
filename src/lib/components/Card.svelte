@@ -33,7 +33,7 @@
 		{#if direction === 'en_de'}
 			<p class="text-2xl font-medium">{card.glosses.join('; ')}</p>
 			<p class="text-sm text-stone-500">
-				{card.pos}{#if card.contextLabel}&ensp;·&ensp;{card.contextLabel}{/if}
+				{card.posLabel}{#if card.contextLabel}&ensp;·&ensp;{card.contextLabel}{/if}
 			</p>
 			{#if back.recall.length}
 				<p class="text-xs text-stone-400">Recall: {back.recall.join(', ')}</p>
@@ -41,7 +41,7 @@
 		{:else}
 			<p class="text-2xl font-medium">{headword}</p>
 			<p class="text-sm text-stone-500">
-				{card.pos}{#if frame}&ensp;·&ensp;{frame}{/if}
+				{card.posLabel}{#if frame}&ensp;·&ensp;{frame}{/if}
 			</p>
 		{/if}
 	</div>

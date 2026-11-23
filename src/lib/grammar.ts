@@ -26,6 +26,10 @@ export const PARTS_OF_SPEECH: PartOfSpeech[] = [
 
 export type Grammar = Record<string, unknown>;
 
+/** The part of speech as shown: postpositions are stored as prepositions. */
+export const posLabel = (pos: PartOfSpeech, grammar: Grammar): string =>
+	pos === 'preposition' && grammar.postposition === true ? 'postposition' : pos;
+
 export type FieldKind =
 	| { type: 'text' }
 	/** Several values, edited as a comma-separated list. */
@@ -138,6 +142,7 @@ export const GRAMMAR_FIELDS: Record<PartOfSpeech, GrammarField[]> = {
 	],
 	adverb: comparison,
 	preposition: [
+		{ key: 'postposition', label: 'Comes after its noun (postposition)', kind: { type: 'bool' } },
 		{ key: 'governs', label: 'Takes', kind: { type: 'multi', options: CASES } },
 		{ key: 'twoWay', label: 'Two-way (Wechselpräposition)', kind: { type: 'bool' } },
 		{ key: 'contractions', label: 'Contractions', kind: { type: 'list' }, german: true }
@@ -280,7 +285,9 @@ export function grammarSummary(pos: PartOfSpeech, g: Grammar, headword = ''): st
 		}
 		case 'preposition': {
 			const cases = list(g.governs).map((c) => `+ ${c.slice(0, 3)}`);
-			return [cases.join(' / '), g.twoWay ? 'two-way' : ''].filter(Boolean).join(' · ');
+			return [g.postposition ? 'after its noun' : '', cases.join(' / '), g.twoWay ? 'two-way' : '']
+				.filter(Boolean)
+				.join(' · ');
 		}
 		default:
 			return '';
