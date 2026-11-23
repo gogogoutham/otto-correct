@@ -312,7 +312,14 @@ function parseNoun(entry: KaikkiEntry): NounGrammar {
 	if (genitives.length) g.genitives = unique(genitives);
 
 	if (tags.includes('plural-only') || tags.includes('plural-normally')) g.pluralOnly = true;
-	else if (!plurals.length && (tags.includes('uncountable') || tags.includes('singular-only')))
+	else if (
+		!plurals.length &&
+		(tags.includes('no-plural') ||
+			tags.includes('uncountable') ||
+			tags.includes('singular-only') ||
+			// The head line says it even when no sense is tagged: "Heimweh n (…, no plural)".
+			entry.head_templates?.some((h) => h.expansion?.includes('no plural')))
+	)
 		g.noPlural = true;
 
 	if (tags.includes('weak')) g.declension = 'weak';
