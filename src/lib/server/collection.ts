@@ -40,13 +40,27 @@ const REGISTER_TAGS = new Set([
 
 export class NotFoundError extends Error {}
 
-/** Meaning-level grammar from a dictionary sense's details. */
-export function meaningGrammarFromSense(details: Record<string, unknown>): Grammar {
+const CASES = ['accusative', 'dative', 'genitive'];
+
+/**
+ * Meaning-level grammar from a dictionary sense's details. For prepositions the gloss
+ * often names the case ("[with dative] in, inside"), which says how this meaning is used.
+ */
+export function meaningGrammarFromSense(
+	details: Record<string, unknown>,
+	glosses: string[] = [],
+	pos?: PartOfSpeech
+): Grammar {
 	const tags = (details.tags as string[] | undefined) ?? [];
 	const g: Grammar = {};
 	if (details.objectCases) g.objectCases = details.objectCases;
 	if (details.prepositionalObjects) g.prepositionalObjects = details.prepositionalObjects;
 	if (details.governs) g.governs = details.governs;
+	const note = /^\[with ([a-z]+)(?: or ([a-z]+))?\]/.exec(glosses[0] ?? '');
+	if (pos === 'preposition' && !g.governs && note) {
+		const cases = [note[1], note[2]].filter((c) => c && CASES.includes(c));
+		if (cases.length) g.governs = cases;
+	}
 	if (tags.includes('reflexive')) g.reflexive = true;
 	const register = tags.filter((t) => REGISTER_TAGS.has(t));
 	if (register.length) g.register = register;
@@ -179,7 +193,11 @@ export async function addFromDictionary(
 					wordId,
 					dictSenseId: sense.id,
 					glosses: sense.glosses,
-					grammar: meaningGrammarFromSense(sense.details as Record<string, unknown>),
+					grammar: meaningGrammarFromSense(
+						sense.details as Record<string, unknown>,
+						sense.glosses,
+						dw.pos
+					),
 					deckStatus: status
 				})
 				.returning({ id: table.meaning.id });
@@ -569,7 +587,11 @@ export async function getWordPage(db: Db, userId: string, wordId: number) {
 			id: table.word.id,
 			headword: table.word.headword,
 			pos: table.word.pos,
-			grammar: table.word.grammar
+			grammar: table.word.grammar,
+			// Column names are written out: drizzle leaves them unqualified inside a subquery.
+			firstGloss: sql<
+				string | null
+			>`(select glosses[1] from meaning m where m.word_id = "word"."id" order by m.id limit 1)`
 		})
 		.from(table.word)
 		.where(
@@ -587,7 +609,7 @@ export async function getWordPage(db: Db, userId: string, wordId: number) {
 			grammar: table.dictWord.grammar,
 			firstGloss: sql<
 				string | null
-			>`(select glosses[1] from dict_sense s where s.dict_word_id = ${table.dictWord.id} order by position limit 1)`
+			>`(select glosses[1] from dict_sense s where s.dict_word_id = "dict_word"."id" order by s.position limit 1)`
 		})
 		.from(table.dictWord)
 		.where(
@@ -618,4 +640,22 @@ export async function getWordPage(db: Db, userId: string, wordId: number) {
 			dictionary: dictionaryHomographs.filter((d) => !inCollection.has(d.id))
 		}
 	};
+}
+
+/** Flags or unflags a meaning's card. Flagged cards can be searched for; scheduling ignores it. */
+export async function setFlag(
+	db: Db,
+	userId: string,
+	meaningId: number,
+	flagged: boolean
+): Promise<void> {
+	await db
+		.update(table.card)
+		.set({ flagged })
+		.where(and(eq(table.card.meaningId, meaningId), eq(table.card.userId, userId)));
+}
+
+/** The word a meaning belongs to. */
+export async function wordIdOfMeaning(db: Db, userId: string, meaningId: number): Promise<number> {
+	return (await ownMeaning(db, userId, meaningId)).wordId;
 }

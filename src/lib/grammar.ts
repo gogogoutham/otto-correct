@@ -26,6 +26,10 @@ export const PARTS_OF_SPEECH: PartOfSpeech[] = [
 
 export type Grammar = Record<string, unknown>;
 
+/** The part of speech as shown: postpositions are stored as prepositions. */
+export const posLabel = (pos: PartOfSpeech, grammar: Grammar): string =>
+	pos === 'preposition' && grammar.postposition === true ? 'postposition' : pos;
+
 export type FieldKind =
 	| { type: 'text' }
 	/** Several values, edited as a comma-separated list. */
@@ -138,20 +142,42 @@ export const GRAMMAR_FIELDS: Record<PartOfSpeech, GrammarField[]> = {
 	],
 	adverb: comparison,
 	preposition: [
+		{ key: 'postposition', label: 'Comes after its noun (postposition)', kind: { type: 'bool' } },
 		{ key: 'governs', label: 'Takes', kind: { type: 'multi', options: CASES } },
 		{ key: 'twoWay', label: 'Two-way (Wechselpräposition)', kind: { type: 'bool' } },
 		{ key: 'contractions', label: 'Contractions', kind: { type: 'list' }, german: true }
 	],
-	conjunction: [],
+	conjunction: [
+		{
+			key: 'wordOrder',
+			label: 'Word order',
+			kind: {
+				type: 'choice',
+				options: [
+					{ value: 'coordinating', label: 'coordinating (und, aber)' },
+					{ value: 'subordinating', label: 'verb at the end (weil, dass)' },
+					{ value: 'adverbial', label: 'verb next (deshalb, trotzdem)' }
+				]
+			}
+		}
+	],
 	particle: [],
 	expression: []
 };
 
-/** Meaning-level fields, the same for every part of speech. */
-export const MEANING_FIELDS: GrammarField[] = [
-	{ key: 'objectCases', label: 'Object case', kind: { type: 'multi', options: CASES } },
-	{ key: 'reflexive', label: 'Reflexive', kind: { type: 'bool' } }
-];
+/** Meaning-level fields that can be edited, by part of speech. */
+export function meaningFields(pos: PartOfSpeech): GrammarField[] {
+	if (pos === 'verb')
+		return [
+			{ key: 'reflexive', label: 'Reflexive (sich)', kind: { type: 'bool' } },
+			{ key: 'objectCases', label: 'Object case', kind: { type: 'multi', options: CASES } }
+		];
+	if (pos === 'preposition')
+		return [
+			{ key: 'governs', label: 'Case in this meaning', kind: { type: 'multi', options: CASES } }
+		];
+	return [];
+}
 
 /** Reads a grammar edit form. Empty fields come back as `undefined`, meaning "remove". */
 export function grammarFromForm(fields: GrammarField[], form: FormData, prefix = ''): Grammar {
@@ -212,9 +238,19 @@ export function articles(grammar: Grammar): string {
 const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 
-/** One line of key grammar, e.g. "fährt · fuhr · ist gefahren" or "-e · des Hundes". */
-export function grammarSummary(pos: PartOfSpeech, g: Grammar): string {
+const WORD_ORDER_SHORT: Record<string, string> = {
+	coordinating: 'normal word order',
+	subordinating: 'verb at the end',
+	adverbial: 'verb next'
+};
+
+/** One line of key grammar, e.g. "fährt · fuhr · ist gefahren" or "die Hunde · des Hundes". */
+export function grammarSummary(pos: PartOfSpeech, g: Grammar, headword = ''): string {
 	switch (pos) {
+		case 'conjunction': {
+			const order = str(g.wordOrder) ?? defaultWordOrder(headword);
+			return order ? (WORD_ORDER_SHORT[order] ?? '') : '';
+		}
 		case 'noun': {
 			const parts: string[] = [];
 			if (g.pluralOnly) parts.push('plural only');
@@ -239,26 +275,74 @@ export function grammarSummary(pos: PartOfSpeech, g: Grammar): string {
 		case 'adjective':
 		case 'adverb': {
 			if (g.notComparable) return 'not comparable';
-			return [str(g.comparative), str(g.superlative) && `am ${str(g.superlative)}`]
+			const superlative = str(g.superlative);
+			return [
+				str(g.comparative),
+				superlative && (superlative.startsWith('am ') ? superlative : `am ${superlative}`)
+			]
 				.filter(Boolean)
 				.join(' · ');
 		}
 		case 'preposition': {
 			const cases = list(g.governs).map((c) => `+ ${c.slice(0, 3)}`);
-			return [cases.join(' / '), g.twoWay ? 'two-way' : ''].filter(Boolean).join(' · ');
+			return [g.postposition ? 'after its noun' : '', cases.join(' / '), g.twoWay ? 'two-way' : '']
+				.filter(Boolean)
+				.join(' · ');
 		}
 		default:
 			return '';
 	}
 }
 
-/** Meaning-level grammar as a short label, e.g. "+ dat · warten auf + acc · reflexive". */
-export function meaningGrammarSummary(g: Grammar): string {
-	const parts: string[] = [];
-	if (g.reflexive) parts.push('reflexive');
-	for (const c of list(g.objectCases)) parts.push(`+ ${c.slice(0, 3)}`);
-	for (const p of (g.prepositionalObjects as { preposition: string; case?: string }[]) ?? [])
-		parts.push(`${p.preposition}${p.case ? ` + ${p.case.slice(0, 3)}` : ''}`);
-	for (const r of list(g.register)) parts.push(r);
-	return parts.join(' · ');
+export type WordOrder = 'coordinating' | 'subordinating' | 'adverbial';
+
+/**
+ * Word order after common conjunctions. Wiktionary doesn't record it, so this list fills
+ * in when the word has none set by hand.
+ */
+const WORD_ORDER: Record<string, WordOrder> = {
+	und: 'coordinating',
+	aber: 'coordinating',
+	oder: 'coordinating',
+	denn: 'coordinating',
+	sondern: 'coordinating',
+	doch: 'coordinating',
+	weil: 'subordinating',
+	dass: 'subordinating',
+	ob: 'subordinating',
+	wenn: 'subordinating',
+	als: 'subordinating',
+	obwohl: 'subordinating',
+	damit: 'subordinating',
+	bevor: 'subordinating',
+	nachdem: 'subordinating',
+	während: 'subordinating',
+	falls: 'subordinating',
+	seit: 'subordinating',
+	seitdem: 'subordinating',
+	sodass: 'subordinating',
+	bis: 'subordinating',
+	sobald: 'subordinating',
+	solange: 'subordinating',
+	wie: 'subordinating',
+	indem: 'subordinating',
+	deshalb: 'adverbial',
+	deswegen: 'adverbial',
+	daher: 'adverbial',
+	darum: 'adverbial',
+	trotzdem: 'adverbial',
+	also: 'adverbial',
+	dann: 'adverbial',
+	sonst: 'adverbial',
+	außerdem: 'adverbial',
+	dennoch: 'adverbial'
+};
+
+export const defaultWordOrder = (headword: string): WordOrder | undefined =>
+	WORD_ORDER[headword.toLowerCase()];
+
+/** Values that aren't stored but are filled in when the word has none (conjunction word order). */
+export function grammarDefaults(headword: string, pos: PartOfSpeech): Grammar {
+	const order = pos === 'conjunction' ? defaultWordOrder(headword) : undefined;
+	return order ? { wordOrder: order } : {};
 }

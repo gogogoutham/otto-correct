@@ -92,6 +92,8 @@ export interface AdjectiveGrammar extends ComparisonGrammar {
 }
 
 export interface PrepositionGrammar {
+	/** Comes after its noun: meiner Meinung nach. */
+	postposition?: boolean;
 	governs?: Case[];
 	twoWay?: boolean;
 	contractions?: string[];
@@ -417,6 +419,8 @@ export function parseEntry(entry: KaikkiEntry, occurrence = 0): ParsedEntry | nu
 	else if (pos === 'adverb') grammar = parseComparison(entry);
 	else if (pos === 'preposition' && PREPOSITIONS[entry.word])
 		grammar = { ...PREPOSITIONS[entry.word] };
+	// Postpositions follow their noun (meiner Meinung nach); they're filed as prepositions.
+	if (entry.pos === 'postp') grammar = { ...grammar, postposition: true };
 
 	const seen = new Set<string>();
 	const forms: ParsedEntry['forms'] = [];

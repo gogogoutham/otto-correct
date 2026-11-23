@@ -21,6 +21,15 @@
 				Search the dictionary in German or English and pick the meanings to learn.
 			</p>
 		</a>
+		<a
+			href={resolve('/practice')}
+			class="rounded-xl border border-stone-200 p-4 hover:bg-stone-50 sm:col-span-2"
+		>
+			<h2 class="font-medium">Practice</h2>
+			<p class="mt-1 text-sm text-stone-600">
+				Flip through the cards you're studying, in either direction.
+			</p>
+		</a>
 		<section class="rounded-xl border border-stone-200 p-4">
 			<h2 class="font-medium">New cards</h2>
 			<p class="mt-1 text-sm text-stone-600">Daily new cards arrive in Milestone 5.</p>
