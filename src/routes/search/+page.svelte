@@ -40,7 +40,9 @@
 								class="flex flex-wrap items-baseline gap-x-2 px-4 py-3 hover:bg-stone-50"
 							>
 								<PosLabel headword={w.headword} pos={w.pos} grammar={w.grammar} />
-								<span class="text-sm text-stone-500">{grammarSummary(w.pos, w.grammar)}</span>
+								<span class="text-sm text-stone-500">
+									{grammarSummary(w.pos, w.grammar, w.headword)}
+								</span>
 								<span class="w-full truncate text-sm text-stone-700">
 									{w.meanings.map((m) => m.glosses[0]).join(' · ')}
 								</span>

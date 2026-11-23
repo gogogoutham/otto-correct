@@ -8,7 +8,7 @@ _to make, to produce, to create (an object, arrangement, situation, etc.)_
 
 Labels: regular
 
-- **Auxiliary:** haben
+- **Perfekt:** hat gemacht
 
 Recall prompt: auxiliary
 
@@ -18,7 +18,7 @@ _to work (to do a specific task by employing physical or mental powers)_
 
 Labels: regular
 
-- **Auxiliary:** haben
+- **Perfekt:** hat gearbeitet
 - **Usage:** an + Dat
 
 Recall prompt: auxiliary, usage
@@ -29,7 +29,7 @@ _to study at university or college level; to be a student (of)_
 
 Labels: regular
 
-- **Auxiliary:** haben
+- **Perfekt:** hat studiert
 
 Recall prompt: auxiliary
 
@@ -39,7 +39,7 @@ _to gather; to assemble; to collect_
 
 Labels: regular
 
-- **Auxiliary:** haben
+- **Perfekt:** hat gesammelt
 
 Recall prompt: auxiliary
 
@@ -181,7 +181,7 @@ _to translate, to interpret_
 
 Labels: regular, inseparable
 
-- **Auxiliary:** haben
+- **Perfekt:** hat übersetzt
 - **No split:** Ich übersetze. · übersetzt · zu übersetzen
 - **Usage:** + Akk · aus + Dat
 
@@ -193,7 +193,7 @@ _to cross, to cross over, to traverse, to ferry [with über (+ accusative) ‘a 
 
 Labels: regular, separable
 
-- **Auxiliary:** sein / haben
+- **Perfekt:** ist / hat übergesetzt
 - **Split:** Ich setze über. · übergesetzt · überzusetzen
 - **Usage:** über + Akk
 
@@ -218,7 +218,7 @@ _to wait (for)_
 
 Labels: regular
 
-- **Auxiliary:** haben
+- **Perfekt:** hat gewartet
 - **Usage:** auf + Akk
 
 Recall prompt: auxiliary, usage
@@ -229,7 +229,7 @@ _to gladden, to make glad, to make pleased_
 
 Labels: regular
 
-- **Auxiliary:** haben
+- **Perfekt:** hat gefreut
 
 Recall prompt: auxiliary
 

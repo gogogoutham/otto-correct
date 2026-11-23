@@ -3,7 +3,7 @@
  * irregular or unpredictable forms. Predictable forms are computed and hidden, and a fully
  * regular word is labelled "regular". Pure functions, shared by the server and the pages.
  */
-import type { Grammar, PartOfSpeech } from './grammar.js';
+import { defaultWordOrder, type Grammar, type PartOfSpeech, type WordOrder } from './grammar.js';
 
 export interface BackLine {
 	label: string;
@@ -236,13 +236,14 @@ function verbBack(word: WordInput): CardBack {
 	const separable = type === 'separable';
 	const back = plain(separable ? `${prefix}|${base}` : word.headword);
 	const auxiliaries = list(g.auxiliaries);
-	const auxText = auxiliaries.join(' / ') || '?';
+	// Always "Perfekt: hat gemacht", so regular and irregular verbs read the same way.
+	const perfect = `${auxiliaries.map((a) => AUXILIARY_LABEL[a] ?? a).join(' / ') || '?'} ${str(g.pastParticiple) ?? '…'}`;
 	const table = IRREGULAR_PRESENT[base];
 	const regular = !table && isRegularVerb(word);
 
 	if (regular) {
 		back.labels.push('regular');
-		back.lines.push({ label: 'Auxiliary', value: auxText });
+		back.lines.push({ label: 'Perfekt', value: perfect });
 		back.recall.push('auxiliary');
 	} else {
 		const third = str(g.thirdPersonPresent);
@@ -251,13 +252,7 @@ function verbBack(word: WordInput): CardBack {
 			back.lines.push({ label: 'er/sie/es', value: third });
 		const preterite = str(g.preterite);
 		if (preterite) back.lines.push({ label: 'Präteritum', value: preterite });
-		const participle = str(g.pastParticiple);
-		if (participle)
-			back.lines.push({
-				label: 'Perfekt',
-				value: `${auxiliaries.map((a) => AUXILIARY_LABEL[a] ?? a).join(' / ') || '?'} ${participle}`
-			});
-		else back.lines.push({ label: 'Auxiliary', value: auxText });
+		back.lines.push({ label: 'Perfekt', value: perfect });
 		// Weak verbs' Konjunktiv II is the Präteritum, so only other verbs show it.
 		const subjunctive = str(g.subjunctiveII);
 		if (subjunctive && g.conjugation !== 'weak')
@@ -470,47 +465,6 @@ function prepositionBack(word: WordInput, meaningGrammar: Grammar): CardBack {
 	return back;
 }
 
-export type WordOrder = 'coordinating' | 'subordinating' | 'adverbial';
-
-/** Word order after common conjunctions, used when the word has none set. */
-const WORD_ORDER: Record<string, WordOrder> = {
-	und: 'coordinating',
-	aber: 'coordinating',
-	oder: 'coordinating',
-	denn: 'coordinating',
-	sondern: 'coordinating',
-	doch: 'coordinating',
-	weil: 'subordinating',
-	dass: 'subordinating',
-	ob: 'subordinating',
-	wenn: 'subordinating',
-	als: 'subordinating',
-	obwohl: 'subordinating',
-	damit: 'subordinating',
-	bevor: 'subordinating',
-	nachdem: 'subordinating',
-	während: 'subordinating',
-	falls: 'subordinating',
-	seit: 'subordinating',
-	seitdem: 'subordinating',
-	sodass: 'subordinating',
-	bis: 'subordinating',
-	sobald: 'subordinating',
-	solange: 'subordinating',
-	wie: 'subordinating',
-	indem: 'subordinating',
-	deshalb: 'adverbial',
-	deswegen: 'adverbial',
-	daher: 'adverbial',
-	darum: 'adverbial',
-	trotzdem: 'adverbial',
-	also: 'adverbial',
-	dann: 'adverbial',
-	sonst: 'adverbial',
-	außerdem: 'adverbial',
-	dennoch: 'adverbial'
-};
-
 export const WORD_ORDER_TEXT: Record<WordOrder, string> = {
 	coordinating: 'normal word order (…, und ich gehe)',
 	subordinating: 'verb at the end (…, weil ich gehe)',
@@ -520,8 +474,7 @@ export const WORD_ORDER_TEXT: Record<WordOrder, string> = {
 function conjunctionBack(word: WordInput): CardBack {
 	const back = plain(word.headword);
 	const order =
-		(str(word.grammar.wordOrder) as WordOrder | undefined) ??
-		WORD_ORDER[word.headword.toLowerCase()];
+		(str(word.grammar.wordOrder) as WordOrder | undefined) ?? defaultWordOrder(word.headword);
 	if (order) {
 		back.lines.push({ label: 'Word order', value: WORD_ORDER_TEXT[order] });
 		back.recall.push('word order');

@@ -40,7 +40,8 @@ describe('verbs', () => {
 		] as const) {
 			const b = back(verb, 'verb', { ...g, conjugation: 'weak', auxiliaries: ['haben'] });
 			expect(b.labels, verb).toEqual(['regular']);
-			expect(lines(b), verb).toEqual({ Auxiliary: 'haben' });
+			expect(Object.keys(lines(b)), verb).toEqual(['Perfekt']);
+			expect(lines(b).Perfekt, verb).toBe(`hat ${g.pastParticiple}`);
 		}
 	});
 
@@ -277,5 +278,15 @@ describe('prepositions and conjunctions', () => {
 	it('strips the grammar note from a gloss', () => {
 		expect(cleanGloss('[with dative] in, inside')).toBe('in, inside');
 		expect(cleanGloss('to drive')).toBe('to drive');
+	});
+});
+
+describe('word summaries', () => {
+	it('shows the superlative once, with "am"', async () => {
+		const { grammarSummary } = await import('./grammar.js');
+		expect(
+			grammarSummary('adjective', { comparative: 'teurer', superlative: 'am teuersten' })
+		).toBe('teurer · am teuersten');
+		expect(grammarSummary('conjunction', {}, 'denn')).toBe('normal word order');
 	});
 });

@@ -5,9 +5,17 @@
 	let {
 		fields,
 		values = {},
+		defaults = {},
 		manual = [],
 		prefix = ''
-	}: { fields: GrammarField[]; values?: Grammar; manual?: string[]; prefix?: string } = $props();
+	}: {
+		fields: GrammarField[];
+		values?: Grammar;
+		/** Values used when a field is left empty, shown on the empty choice. */
+		defaults?: Grammar;
+		manual?: string[];
+		prefix?: string;
+	} = $props();
 </script>
 
 <div class="grid gap-3 sm:grid-cols-2">
@@ -43,8 +51,9 @@
 						</span>{/if}{#if edited}<span class="ml-1 text-xs text-amber-700">edited</span>{/if}
 				</span>
 				{#if f.kind.type === 'choice'}
+					{@const fallback = f.kind.options.find((o) => o.value === defaults[f.key])}
 					<select {name} class="rounded-lg border border-stone-300 px-2 py-1.5">
-						<option value="">—</option>
+						<option value="">{fallback ? `default: ${fallback.label}` : '—'}</option>
 						{#each f.kind.options as o (o.value)}
 							<option value={o.value} selected={values[f.key] === o.value}>{o.label}</option>
 						{/each}

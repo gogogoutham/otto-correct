@@ -5,7 +5,13 @@
 	import DictionaryEntry from '#lib/components/DictionaryEntry.svelte';
 	import GrammarFields from '#lib/components/GrammarFields.svelte';
 	import PosLabel from '#lib/components/PosLabel.svelte';
-	import { GRAMMAR_FIELDS, grammarSummary, meaningFields, type Grammar } from '#lib/grammar.js';
+	import {
+		GRAMMAR_FIELDS,
+		grammarDefaults,
+		grammarSummary,
+		meaningFields,
+		type Grammar
+	} from '#lib/grammar.js';
 	import { meaningUsage } from '#lib/card-back.js';
 	import { page } from '$app/state';
 	import type { DictionaryHit } from '#lib/server/search.js';
@@ -15,7 +21,7 @@
 	let { data, form }: PageProps = $props();
 	const w = $derived(data.word);
 	const grammar = $derived(w.grammar as Grammar);
-	const summary = $derived(grammarSummary(w.pos, grammar));
+	const summary = $derived(grammarSummary(w.pos, grammar, w.headword));
 	const fields = $derived(GRAMMAR_FIELDS[w.pos]);
 	/** Where to go back to when this page was opened from a practice session. */
 	const returnTo = $derived.by(() => {
@@ -343,7 +349,12 @@
 				</span>
 				<input name="headword" value={w.headword} required data-german class={inputClass} />
 			</label>
-			<GrammarFields {fields} values={grammar} manual={w.manualFields} />
+			<GrammarFields
+				{fields}
+				values={grammar}
+				defaults={grammarDefaults(w.headword, w.pos)}
+				manual={w.manualFields}
+			/>
 			<p class="text-xs text-stone-500">
 				Fields you change are marked edited and are kept when the word is re-synced.
 			</p>

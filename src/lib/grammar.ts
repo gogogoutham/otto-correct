@@ -233,9 +233,19 @@ export function articles(grammar: Grammar): string {
 const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 
-/** One line of key grammar, e.g. "fährt · fuhr · ist gefahren" or "-e · des Hundes". */
-export function grammarSummary(pos: PartOfSpeech, g: Grammar): string {
+const WORD_ORDER_SHORT: Record<string, string> = {
+	coordinating: 'normal word order',
+	subordinating: 'verb at the end',
+	adverbial: 'verb next'
+};
+
+/** One line of key grammar, e.g. "fährt · fuhr · ist gefahren" or "die Hunde · des Hundes". */
+export function grammarSummary(pos: PartOfSpeech, g: Grammar, headword = ''): string {
 	switch (pos) {
+		case 'conjunction': {
+			const order = str(g.wordOrder) ?? defaultWordOrder(headword);
+			return order ? (WORD_ORDER_SHORT[order] ?? '') : '';
+		}
 		case 'noun': {
 			const parts: string[] = [];
 			if (g.pluralOnly) parts.push('plural only');
@@ -260,7 +270,11 @@ export function grammarSummary(pos: PartOfSpeech, g: Grammar): string {
 		case 'adjective':
 		case 'adverb': {
 			if (g.notComparable) return 'not comparable';
-			return [str(g.comparative), str(g.superlative) && `am ${str(g.superlative)}`]
+			const superlative = str(g.superlative);
+			return [
+				str(g.comparative),
+				superlative && (superlative.startsWith('am ') ? superlative : `am ${superlative}`)
+			]
 				.filter(Boolean)
 				.join(' · ');
 		}
@@ -271,4 +285,57 @@ export function grammarSummary(pos: PartOfSpeech, g: Grammar): string {
 		default:
 			return '';
 	}
+}
+
+export type WordOrder = 'coordinating' | 'subordinating' | 'adverbial';
+
+/**
+ * Word order after common conjunctions. Wiktionary doesn't record it, so this list fills
+ * in when the word has none set by hand.
+ */
+const WORD_ORDER: Record<string, WordOrder> = {
+	und: 'coordinating',
+	aber: 'coordinating',
+	oder: 'coordinating',
+	denn: 'coordinating',
+	sondern: 'coordinating',
+	doch: 'coordinating',
+	weil: 'subordinating',
+	dass: 'subordinating',
+	ob: 'subordinating',
+	wenn: 'subordinating',
+	als: 'subordinating',
+	obwohl: 'subordinating',
+	damit: 'subordinating',
+	bevor: 'subordinating',
+	nachdem: 'subordinating',
+	während: 'subordinating',
+	falls: 'subordinating',
+	seit: 'subordinating',
+	seitdem: 'subordinating',
+	sodass: 'subordinating',
+	bis: 'subordinating',
+	sobald: 'subordinating',
+	solange: 'subordinating',
+	wie: 'subordinating',
+	indem: 'subordinating',
+	deshalb: 'adverbial',
+	deswegen: 'adverbial',
+	daher: 'adverbial',
+	darum: 'adverbial',
+	trotzdem: 'adverbial',
+	also: 'adverbial',
+	dann: 'adverbial',
+	sonst: 'adverbial',
+	außerdem: 'adverbial',
+	dennoch: 'adverbial'
+};
+
+export const defaultWordOrder = (headword: string): WordOrder | undefined =>
+	WORD_ORDER[headword.toLowerCase()];
+
+/** Values that aren't stored but are filled in when the word has none (conjunction word order). */
+export function grammarDefaults(headword: string, pos: PartOfSpeech): Grammar {
+	const order = pos === 'conjunction' ? defaultWordOrder(headword) : undefined;
+	return order ? { wordOrder: order } : {};
 }

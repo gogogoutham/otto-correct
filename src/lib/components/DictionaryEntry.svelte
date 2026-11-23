@@ -19,7 +19,7 @@
 	let choice = $state<Record<number, '' | 'studying' | 'known'>>({});
 	let busy = $state(false);
 	const chosen = $derived(Object.values(choice).filter(Boolean).length);
-	const summary = $derived(grammarSummary(hit.pos, hit.grammar));
+	const summary = $derived(grammarSummary(hit.pos, hit.grammar, hit.headword));
 	const open = $derived(hit.senses.filter((s) => !s.inCollection));
 
 	const options = [
