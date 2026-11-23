@@ -2,8 +2,6 @@
  * Everything one card shows: the front in either direction and the back, built from the
  * meaning, its word, the grammar rules, other meanings and homographs.
  */
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import * as table from './db/schema.js';
 import type { Db } from './dictionary/store.js';
 import { getWordPage, wordIdOfMeaning } from './collection.js';
 import { buildCardBack, cleanGloss, type CardBack } from '#lib/card-back.js';
@@ -99,41 +97,4 @@ export async function getCard(db: Db, userId: string, meaningId: number): Promis
 			}))
 		]
 	};
-}
-
-export interface PracticeFilter {
-	tags: string[];
-	pos: PartOfSpeech | null;
-}
-
-/**
- * The meanings a practice run walks through: studying meanings, oldest queued first,
- * matching any selected tag and the part of speech. Scheduling replaces this in M5.
- */
-export async function practiceQueue(
-	db: Db,
-	userId: string,
-	filter: PracticeFilter
-): Promise<number[]> {
-	const conditions = [eq(table.meaning.userId, userId), eq(table.meaning.deckStatus, 'studying')];
-	if (filter.pos) conditions.push(eq(table.word.pos, filter.pos));
-	if (filter.tags.length)
-		conditions.push(
-			inArray(
-				table.meaning.id,
-				db
-					.select({ id: table.meaningTag.meaningId })
-					.from(table.meaningTag)
-					.innerJoin(table.tag, eq(table.tag.id, table.meaningTag.tagId))
-					.where(and(eq(table.tag.userId, userId), inArray(table.tag.name, filter.tags)))
-			)
-		);
-	const rows = await db
-		.select({ id: table.meaning.id })
-		.from(table.meaning)
-		.innerJoin(table.word, eq(table.word.id, table.meaning.wordId))
-		.leftJoin(table.card, eq(table.card.meaningId, table.meaning.id))
-		.where(and(...conditions))
-		.orderBy(sql`${table.card.queuedAt} nulls last`, asc(table.meaning.id));
-	return rows.map((r) => r.id);
 }
