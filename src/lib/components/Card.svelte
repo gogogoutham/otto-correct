@@ -101,6 +101,12 @@
 						<li>
 							<span class="italic">{ex.german}</span>
 							{#if ex.english}<span class="text-stone-500">&ensp;{ex.english}</span>{/if}
+							{#if ex.source === 'ai'}<span
+									class="ml-1 rounded bg-violet-50 px-1 text-xs text-violet-700"
+									title="Drafted by AI"
+								>
+									AI
+								</span>{/if}
 						</li>
 					{/each}
 				</ul>

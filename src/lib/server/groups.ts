@@ -429,6 +429,74 @@ export async function groupsOfMeanings(
 	return out;
 }
 
+/** Lower-cased with parentheticals dropped: "to know (a fact)" → "to know". */
+const glossCore = (s: string) =>
+	s
+		.toLowerCase()
+		.replace(/\([^)]*\)/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+/**
+ * Whether a meaning's translations match a group's English label: some translation, minus
+ * any parenthetical, is the label or one of its "/" alternatives ("at / in" matches "in").
+ */
+export function glossesMatchLabel(glosses: string[], label: string): boolean {
+	const wanted = new Set(
+		glossCore(label)
+			.split('/')
+			.map((p) => p.trim())
+			.filter(Boolean)
+	);
+	return glosses.some((g) =>
+		g.split(/[,;]/).some((part) => {
+			const c = glossCore(part);
+			return wanted.has(c) || wanted.has(`to ${c}`);
+		})
+	);
+}
+
+/**
+ * Contrast groups a meaning could join, by its translations matching the group's label,
+ * leaving out the groups it is already in.
+ */
+export async function suggestGroupsForMeanings(
+	db: Db,
+	userId: string,
+	meanings: { id: number; glosses: string[] }[]
+): Promise<Map<number, { id: number; title: string }[]>> {
+	const out = new Map<number, { id: number; title: string }[]>();
+	if (!meanings.length) return out;
+	const [groups, memberships] = await Promise.all([
+		db
+			.select({ id: table.group.id, label: table.group.label })
+			.from(table.group)
+			.where(and(eq(table.group.userId, userId), eq(table.group.kind, 'contrast')))
+			.orderBy(asc(table.group.label)),
+		db
+			.select({ meaningId: table.groupMember.meaningId, groupId: table.groupMember.groupId })
+			.from(table.groupMember)
+			.where(
+				inArray(
+					table.groupMember.meaningId,
+					meanings.map((m) => m.id)
+				)
+			)
+	]);
+	const joined = new Set(memberships.map((x) => `${x.meaningId}:${x.groupId}`));
+	for (const m of meanings) {
+		const fits = groups.filter(
+			(g) => !joined.has(`${m.id}:${g.id}`) && glossesMatchLabel(m.glosses, g.label)
+		);
+		if (fits.length)
+			out.set(
+				m.id,
+				fits.map((g) => ({ id: g.id, title: g.label }))
+			);
+	}
+	return out;
+}
+
 /** Groups whose label matches an English search term, for the top of search results. */
 export async function searchGroups(
 	db: Db,

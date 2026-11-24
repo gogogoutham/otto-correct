@@ -17,7 +17,15 @@ import {
 	type DeckStatus
 } from '#lib/server/collection.js';
 import { int, senseSelections, text, userId } from '#lib/server/forms.js';
-import { groupsOfMeanings, prefixMeaningsForWord, setPrefixMeaning } from '#lib/server/groups.js';
+import {
+	addMember,
+	groupsOfMeanings,
+	prefixMeaningsForWord,
+	setPrefixMeaning,
+	suggestGroupsForMeanings
+} from '#lib/server/groups.js';
+import { addAiExample, aiClient, AiError, applyPrefixSuggestion } from '#lib/server/ai.js';
+import { ANTHROPIC_API_KEY } from '$app/env/private';
 import { GRAMMAR_FIELDS, grammarFromForm, meaningFields } from '#lib/grammar.js';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -48,16 +56,21 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		listTags(db, uid),
 		prefixMeaningsForWord(db, uid, id)
 	]);
-	const groups = await groupsOfMeanings(
-		db,
-		uid,
-		page.meanings.map((m) => m.id)
-	);
+	const [groups, suggested] = await Promise.all([
+		groupsOfMeanings(
+			db,
+			uid,
+			page.meanings.map((m) => m.id)
+		),
+		suggestGroupsForMeanings(db, uid, page.meanings)
+	]);
 	return {
 		...page,
 		tags,
 		prefixMeanings,
 		groupsByMeaning: Object.fromEntries(groups),
+		suggestedGroups: Object.fromEntries(suggested),
+		ai: !!ANTHROPIC_API_KEY,
 		added: Number(url.searchParams.get('added')) || 0
 	};
 };
@@ -110,6 +123,27 @@ export const actions: Actions = {
 		);
 	},
 
+	/** Asks the AI which prefix meaning this verb meaning shows, and records it. */
+	suggestPrefix: async ({ request, locals }) => {
+		const client = aiClient(ANTHROPIC_API_KEY);
+		if (!client) return fail(400, { message: 'AI suggestions are not set up.' });
+		const form = await request.formData();
+		const meaningId = int(form, 'meaningId');
+		try {
+			const label = await guard(() => applyPrefixSuggestion(db, client, userId(locals), meaningId));
+			return { suggested: { meaningId, label } };
+		} catch (e) {
+			if (e instanceof AiError) return fail(502, { message: e.message });
+			throw e;
+		}
+	},
+
+	/** Adds a meaning to a contrast group whose label its translation matches. */
+	joinGroup: async ({ request, locals }) => {
+		const form = await request.formData();
+		await guard(() => addMember(db, userId(locals), int(form, 'groupId'), int(form, 'meaningId')));
+	},
+
 	status: async ({ request, locals }) => {
 		const uid = userId(locals);
 		const form = await request.formData();
@@ -126,6 +160,19 @@ export const actions: Actions = {
 		await guard(() =>
 			addExample(db, uid, int(form, 'meaningId'), german, text(form, 'english') || null)
 		);
+	},
+
+	/** Drafts an example sentence with AI, saved and labelled as such. */
+	aiExample: async ({ request, locals }) => {
+		const client = aiClient(ANTHROPIC_API_KEY);
+		if (!client) return fail(400, { message: 'AI examples are not set up.' });
+		const form = await request.formData();
+		try {
+			await guard(() => addAiExample(db, client, userId(locals), int(form, 'meaningId')));
+		} catch (e) {
+			if (e instanceof AiError) return fail(502, { message: e.message });
+			throw e;
+		}
 	},
 
 	deleteExample: async ({ request, locals }) => {

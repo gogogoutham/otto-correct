@@ -176,7 +176,7 @@
 	{#if g.related.length}
 		<p class="text-sm">
 			<span class="text-stone-500">Related:</span>
-			{#each g.related as r, i (r.id)}{#if i},&#32;{/if}<a
+			{#each g.related as r, i (r.id)}{i ? ', ' : ''}<a
 					href={resolve('/groups/[id]', { id: String(r.id) })}
 					class="text-blue-700 hover:underline"
 				>

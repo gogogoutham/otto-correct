@@ -6,7 +6,8 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { addAiExample, applyPrefixSuggestion, type AiClient } from './ai.js';
 import * as table from './db/schema.js';
 import type { Db } from './dictionary/store.js';
 import { addFromDictionary, setDeckStatus, setMeaningTags } from './collection.js';
@@ -18,12 +19,24 @@ import {
 	loadStarterSet,
 	prefixMeaningsForWord,
 	searchGroups,
-	setPrefixMeaning
+	setPrefixMeaning,
+	suggestGroupsForMeanings
 } from './groups.js';
 import { STARTER_GROUPS } from './groups/starter.js';
 import { loadStudyData, queueFor } from './study.js';
 
 const url = process.env.DATABASE_URL;
+
+/** A client that answers every request with this JSON. */
+const answering = (json: unknown) => {
+	const create = vi.fn(() =>
+		Promise.resolve({
+			stop_reason: 'end_turn',
+			content: [{ type: 'text', text: JSON.stringify(json) }]
+		})
+	);
+	return { client: { messages: { create } } as unknown as AiClient, create };
+};
 
 describe.skipIf(!url)('groups (database)', () => {
 	const client = postgres(url ?? '', { prepare: false, max: 2, onnotice: () => {} });
@@ -181,6 +194,46 @@ describe.skipIf(!url)('groups (database)', () => {
 		const g = await getGroup(db, userId, (await groupByLabel('to know')).id);
 		const card = await getCard(db, userId, g.members[0].meaningId);
 		expect(card.groups.map((x) => x.title)).toContain('to know');
+	});
+
+	it('saves AI examples labelled as such, and records AI prefix suggestions', async (ctx) => {
+		if (!bankLoaded) ctx.skip();
+		const [m] = await db
+			.select({ id: table.meaning.id })
+			.from(table.meaning)
+			.innerJoin(table.word, eq(table.word.id, table.meaning.wordId))
+			.where(and(eq(table.meaning.userId, userId), eq(table.word.headword, 'ankommen')))
+			.limit(1);
+		const ex = answering({
+			german: 'Der Zug kommt um acht an.',
+			english: 'The train arrives at eight.'
+		});
+		await addAiExample(db, ex.client, userId, m.id);
+		const saved = await db.select().from(table.example).where(eq(table.example.meaningId, m.id));
+		expect(saved.at(-1)).toMatchObject({ german: 'Der Zug kommt um acht an.', source: 'ai' });
+		expect(JSON.stringify(ex.create.mock.calls[0])).toContain('ankommen');
+
+		const pick = answering({ choice: 'beginning' });
+		expect(await applyPrefixSuggestion(db, pick.client, userId, m.id)).toBe('beginning');
+		const [ankommen] = await db
+			.select({ wordId: table.meaning.wordId })
+			.from(table.meaning)
+			.where(eq(table.meaning.id, m.id));
+		const info = (await prefixMeaningsForWord(db, userId, ankommen.wordId))!;
+		expect(info.options.find((o) => o.id === info.byMeaning[m.id])?.label).toBe('beginning');
+		const none = answering({ choice: 'none' });
+		expect(await applyPrefixSuggestion(db, none.client, userId, m.id)).toBeNull();
+	});
+
+	it('suggests contrast groups whose label a meaning translates', async (ctx) => {
+		if (!bankLoaded) ctx.skip();
+		const g = await groupByLabel('to know');
+		const view = await getGroup(db, userId, g.id);
+		const fake = { id: -1, glosses: ['to know (a person)'] };
+		const member = { id: view.members[0].meaningId, glosses: ['to know'] };
+		const out = await suggestGroupsForMeanings(db, userId, [fake, member]);
+		expect(out.get(-1)?.map((x) => x.title)).toEqual(['to know']);
+		expect(out.has(member.id)).toBe(false);
 	});
 
 	it("refuses another user's meaning as a member", async (ctx) => {
