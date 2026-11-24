@@ -311,7 +311,14 @@ function parseNoun(entry: KaikkiEntry): NounGrammar {
 	if (plurals.length) g.plurals = unique(plurals);
 	if (genitives.length) g.genitives = unique(genitives);
 
-	if (tags.includes('plural-only') || tags.includes('plural-normally')) g.pluralOnly = true;
+	// One plural-only sense (Apfel: "Äpfel", poetic for breasts) doesn't make the word
+	// plural-only when the head line gives it a normal plural.
+	const pluralOnlySense = (s: { tags?: string[] }) =>
+		hasTags(s.tags, 'plural-only') || hasTags(s.tags, 'plural-normally');
+	const senses = entry.senses ?? [];
+	const headPlurals = forms.some((f) => f.tags?.length === 1 && f.tags[0] === 'plural');
+	if (senses.some(pluralOnlySense) && (!headPlurals || senses.every(pluralOnlySense)))
+		g.pluralOnly = true;
 	else if (
 		!plurals.length &&
 		(tags.includes('no-plural') ||
