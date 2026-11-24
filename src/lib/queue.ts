@@ -12,7 +12,8 @@
  * - Pausing and resuming: cards already reviewed today (cram: crammed today) are skipped.
  * - Order: oldest first-seen first, or shuffled (stable for the day, so resuming keeps it).
  * - Filters: any of the selected tags, and a part of speech. Group cards only in
- *   English → German sessions.
+ *   English → German sessions; they match a filter through any in-deck member.
+ * - Group cards enter the new-card queue when their group qualifies (`queuedAt`).
  */
 
 export type DeckStatus = 'studying' | 'known' | 'not_in_deck';
@@ -26,8 +27,11 @@ export interface QueueCard {
 	status: DeckStatus;
 	/** When the card joined the new-card queue; null if it never did (added as known). */
 	queuedAt: Date | null;
+	/** Group cards: the tags of their in-deck members. */
 	tags: string[];
+	/** Group cards: null, with their in-deck members' parts of speech in `posList`. */
 	pos: string | null;
+	posList?: string[];
 }
 
 export interface QueueEvent {
@@ -158,7 +162,7 @@ export function histories(
 
 function matchesFilter(card: QueueCard, filter: QueueFilter, direction: Direction): boolean {
 	if (card.kind === 'group' && direction !== 'en_de') return false;
-	if (filter.pos && card.pos !== filter.pos) return false;
+	if (filter.pos && card.pos !== filter.pos && !card.posList?.includes(filter.pos)) return false;
 	if (filter.tags.length && !card.tags.some((t) => filter.tags.includes(t))) return false;
 	return true;
 }

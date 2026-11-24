@@ -34,6 +34,16 @@
 	const day = (d: Date | string | null) =>
 		d ? new Date(d).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
 
+	/** Meanings with an AI request in flight, to disable their buttons meanwhile. */
+	let drafting = $state<Record<string, boolean>>({});
+	const busy = (key: string) => () => {
+		drafting[key] = true;
+		return async ({ update }: { update: () => Promise<void> }) => {
+			await update();
+			drafting[key] = false;
+		};
+	};
+
 	const STATUS_LABEL = { studying: 'Studying', known: 'Known', not_in_deck: 'Not in deck' };
 
 	const more = $derived<DictionaryHit | null>(
@@ -150,6 +160,81 @@
 					</form>
 				</div>
 
+				{#if data.prefixMeanings?.options.length}
+					<form
+						method="POST"
+						action={actionUrl(page.url.search, 'prefixMeaning')}
+						use:enhance={busy(`p${m.id}`)}
+						class="flex flex-wrap items-center gap-2 text-sm"
+					>
+						<input type="hidden" name="meaningId" value={m.id} />
+						<label for="prefix-meaning-{m.id}" class="text-stone-500">
+							{data.prefixMeanings.prefix}- here means
+						</label>
+						<select
+							id="prefix-meaning-{m.id}"
+							name="groupId"
+							class="rounded-lg border border-stone-300 px-2 py-1"
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+						>
+							<option value="">not set</option>
+							{#each data.prefixMeanings.options as o (o.id)}
+								<option value={o.id} selected={data.prefixMeanings.byMeaning[m.id] === o.id}>
+									{o.label}
+								</option>
+							{/each}
+						</select>
+						{#if data.ai && !data.prefixMeanings.byMeaning[m.id]}
+							<button
+								formaction={actionUrl(page.url.search, 'suggestPrefix')}
+								disabled={drafting[`p${m.id}`]}
+								class="text-blue-700 hover:underline disabled:text-stone-400"
+							>
+								{drafting[`p${m.id}`] ? 'Asking AI…' : 'Suggest with AI'}
+							</button>
+						{/if}
+						{#if form && 'suggested' in form && form.suggested?.meaningId === m.id && !form.suggested.label}
+							<span class="text-stone-500">
+								The AI found no meaning of {data.prefixMeanings.prefix}- that fits.
+							</span>
+						{/if}
+					</form>
+				{/if}
+
+				{#if data.groupsByMeaning[m.id]?.length}
+					<p class="text-sm">
+						<span class="text-stone-500">In groups:</span>
+						{#each data.groupsByMeaning[m.id] as g, i (g.id)}{i ? ', ' : ''}<a
+								href={resolve('/groups/[id]', { id: String(g.id) })}
+								class="text-blue-700 hover:underline"
+							>
+								{g.title}
+							</a>{/each}
+					</p>
+				{/if}
+
+				{#each data.suggestedGroups[m.id] ?? [] as g (g.id)}
+					<form
+						method="POST"
+						action={actionUrl(page.url.search, 'joinGroup')}
+						use:enhance
+						class="flex flex-wrap items-center gap-2 text-sm"
+					>
+						<input type="hidden" name="meaningId" value={m.id} />
+						<input type="hidden" name="groupId" value={g.id} />
+						<span class="text-stone-500">
+							Fits the group
+							<a
+								href={resolve('/groups/[id]', { id: String(g.id) })}
+								class="text-blue-700 hover:underline"
+							>
+								{g.title}
+							</a>.
+						</span>
+						<button class="text-blue-700 hover:underline">Add it</button>
+					</form>
+				{/each}
+
 				{#if m.tags.length}
 					<ul class="flex flex-wrap gap-1">
 						{#each m.tags as t (t)}
@@ -165,6 +250,12 @@
 								<span>
 									<span class="italic">{ex.german}</span>
 									{#if ex.english}<span class="text-stone-500">&ensp;{ex.english}</span>{/if}
+									{#if ex.source === 'ai'}<span
+											class="ml-1 rounded bg-violet-50 px-1 text-xs text-violet-700"
+											title="Drafted by AI"
+										>
+											AI
+										</span>{/if}
 								</span>
 								<form
 									method="POST"
@@ -246,6 +337,21 @@
 							<div><button class={buttonClass}>Save</button></div>
 						</form>
 					</details>
+					{#if data.ai}
+						<form
+							method="POST"
+							action={actionUrl(page.url.search, 'aiExample')}
+							use:enhance={busy(`e${m.id}`)}
+						>
+							<input type="hidden" name="meaningId" value={m.id} />
+							<button
+								disabled={drafting[`e${m.id}`]}
+								class="text-blue-700 hover:underline disabled:text-stone-400"
+							>
+								{drafting[`e${m.id}`] ? 'Drafting…' : 'Draft an example with AI'}
+							</button>
+						</form>
+					{/if}
 					<details class="w-full">
 						<summary class="cursor-pointer text-blue-700">Add example</summary>
 						<form

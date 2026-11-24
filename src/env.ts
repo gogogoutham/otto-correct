@@ -12,5 +12,10 @@ export const variables = defineEnvVars({
 		description:
 			'Password for the first account. Only used while no account exists; remove it once you have logged in.',
 		schema: optional
+	},
+	ANTHROPIC_API_KEY: {
+		description:
+			'Optional Claude API key. Turns on AI-drafted examples and prefix-meaning suggestions.',
+		schema: optional
 	}
 });

@@ -33,6 +33,7 @@
 				/>
 			</form>
 			<a href={resolve('/review')} class="text-sm text-stone-600 hover:text-stone-900">Review</a>
+			<a href={resolve('/groups')} class="text-sm text-stone-600 hover:text-stone-900">Groups</a>
 			<a href={resolve('/settings')} class="text-sm text-stone-600 hover:text-stone-900">
 				Settings
 			</a>

@@ -335,10 +335,19 @@ export const group = pgTable(
 		prefixId: integer('prefix_id').references(() => prefix.id),
 		/** When the group first had two in-deck members; it then joins the new-card queue. */
 		qualifiedAt: timestamp('qualified_at', { withTimezone: true }),
+		/** Which starter group this came from, so loading the starter set twice adds nothing. */
+		seedKey: text('seed_key'),
 		createdAt: createdAt(),
 		updatedAt: updatedAt()
 	},
-	(t) => [index('group_user_kind_idx').on(t.userId, t.kind)]
+	(t) => [
+		index('group_user_kind_idx').on(t.userId, t.kind),
+		uniqueIndex('group_user_seed_idx').on(t.userId, t.seedKey),
+		// One verb family per base verb.
+		uniqueIndex('group_user_family_idx')
+			.on(t.userId, t.label)
+			.where(sql`${t.kind} = 'verb_family'`)
+	]
 );
 
 export const groupRelation = pgTable(

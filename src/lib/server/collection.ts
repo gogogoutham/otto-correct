@@ -9,6 +9,7 @@ import * as table from './db/schema.js';
 import type { Db } from './dictionary/store.js';
 import { fetchEntries } from './dictionary/lookup.js';
 import { storeEntries } from './dictionary/store.js';
+import { refreshGroups } from './group-sync.js';
 
 export type DeckStatus = (typeof table.deckStatus.enumValues)[number];
 export type PartOfSpeech = (typeof table.partOfSpeech.enumValues)[number];
@@ -117,9 +118,20 @@ export async function listTags(db: Db, userId: string): Promise<string[]> {
 // Adding words
 // ---------------------------------------------------------------------------
 
+/** The prefix row for a verb's `grammar.prefix`, if it is one the app knows. */
+export async function prefixIdOf(db: Db, pos: string, grammar: Grammar): Promise<number | null> {
+	if (pos !== 'verb' || typeof grammar.prefix !== 'string') return null;
+	const [p] = await db
+		.select({ id: table.prefix.id })
+		.from(table.prefix)
+		.where(eq(table.prefix.prefix, grammar.prefix));
+	return p?.id ?? null;
+}
+
 export interface SenseSelection {
 	dictSenseId: number;
-	status: Exclude<DeckStatus, 'not_in_deck'>;
+	/** Not in deck is used by the starter set: the meaning shows greyed out until added. */
+	status: DeckStatus;
 }
 
 /**
@@ -137,7 +149,8 @@ export async function addFromDictionary(
 	const [dw] = await db.select().from(table.dictWord).where(eq(table.dictWord.id, dictWordId));
 	if (!dw) throw new NotFoundError('Dictionary word not found');
 
-	return db.transaction(async (tx) => {
+	const promote: [number, DeckStatus][] = [];
+	const id = await db.transaction(async (tx) => {
 		const [existing] = await tx
 			.select({ id: table.word.id })
 			.from(table.word)
@@ -153,6 +166,7 @@ export async function addFromDictionary(
 						pos: dw.pos,
 						dictWordId,
 						grammar: dw.grammar,
+						prefixId: await prefixIdOf(tx, dw.pos, dw.grammar as Grammar),
 						sourceSyncedAt: new Date()
 					})
 					.returning({ id: table.word.id })
@@ -165,14 +179,21 @@ export async function addFromDictionary(
 			.from(table.dictSense)
 			.where(and(eq(table.dictSense.dictWordId, dictWordId), inArray(table.dictSense.id, senseIds)))
 			.orderBy(asc(table.dictSense.position));
-		const already = new Set(
-			(
-				await tx
-					.select({ id: table.meaning.dictSenseId })
-					.from(table.meaning)
-					.where(and(eq(table.meaning.wordId, wordId), isNotNull(table.meaning.dictSenseId)))
-			).map((r) => r.id)
-		);
+		const owned = await tx
+			.select({
+				id: table.meaning.id,
+				senseId: table.meaning.dictSenseId,
+				status: table.meaning.deckStatus
+			})
+			.from(table.meaning)
+			.where(and(eq(table.meaning.wordId, wordId), isNotNull(table.meaning.dictSenseId)));
+		const already = new Set(owned.map((r) => r.senseId));
+		// A meaning that is already here but not in the deck (from the starter set) is added.
+		for (const o of owned) {
+			const wanted = selections.find((s) => s.dictSenseId === o.senseId)?.status;
+			if (o.status === 'not_in_deck' && wanted && wanted !== 'not_in_deck')
+				promote.push([o.id, wanted]);
+		}
 		const statusFor = new Map(selections.map((s) => [s.dictSenseId, s.status]));
 		const examples = await tx
 			.select()
@@ -226,6 +247,9 @@ export async function addFromDictionary(
 		await tx.update(table.word).set({ updatedAt: new Date() }).where(eq(table.word.id, wordId));
 		return wordId;
 	});
+	for (const [meaningId, status] of promote) await setDeckStatus(db, userId, meaningId, status);
+	await refreshGroups(db, userId);
+	return id;
 }
 
 export interface ManualWordInput {
@@ -236,7 +260,7 @@ export interface ManualWordInput {
 	contextLabel?: string;
 	exampleGerman?: string;
 	exampleEnglish?: string;
-	status: Exclude<DeckStatus, 'not_in_deck'>;
+	status: DeckStatus;
 	tags: string[];
 }
 
@@ -246,7 +270,7 @@ export async function createManualWord(
 	userId: string,
 	input: ManualWordInput
 ): Promise<number> {
-	return db.transaction(async (tx) => {
+	const id = await db.transaction(async (tx) => {
 		const [w] = await tx
 			.insert(table.word)
 			.values({
@@ -254,6 +278,7 @@ export async function createManualWord(
 				headword: input.headword,
 				pos: input.pos,
 				grammar: input.grammar,
+				prefixId: await prefixIdOf(tx, input.pos, input.grammar),
 				manualFields: Object.keys(input.grammar)
 			})
 			.returning({ id: table.word.id });
@@ -267,6 +292,8 @@ export async function createManualWord(
 		});
 		return w.id;
 	});
+	await refreshGroups(db, userId);
+	return id;
 }
 
 export interface ManualMeaningInput {
@@ -274,7 +301,7 @@ export interface ManualMeaningInput {
 	contextLabel?: string;
 	exampleGerman?: string;
 	exampleEnglish?: string;
-	status: Exclude<DeckStatus, 'not_in_deck'>;
+	status: DeckStatus;
 	tags: string[];
 }
 
@@ -286,7 +313,9 @@ export async function addManualMeaning(
 	input: ManualMeaningInput
 ): Promise<number> {
 	await ownWord(db, userId, wordId);
-	return db.transaction((tx) => insertMeaning(tx, userId, wordId, input));
+	const id = await db.transaction((tx) => insertMeaning(tx, userId, wordId, input));
+	await refreshGroups(db, userId);
+	return id;
 }
 
 async function insertMeaning(
@@ -335,7 +364,7 @@ const splitGlosses = (gloss: string) =>
 // Editing
 // ---------------------------------------------------------------------------
 
-async function ownWord(db: Db, userId: string, wordId: number) {
+export async function ownWord(db: Db, userId: string, wordId: number) {
 	const [w] = await db
 		.select()
 		.from(table.word)
@@ -344,7 +373,7 @@ async function ownWord(db: Db, userId: string, wordId: number) {
 	return w;
 }
 
-async function ownMeaning(db: Db, userId: string, meaningId: number) {
+export async function ownMeaning(db: Db, userId: string, meaningId: number) {
 	const [m] = await db
 		.select()
 		.from(table.meaning)
@@ -376,13 +405,18 @@ export async function updateWordGrammar(
 		else grammar[key] = value;
 		manual.add(key);
 	}
-	const set: Partial<typeof table.word.$inferInsert> = { grammar, manualFields: [...manual] };
+	const set: Partial<typeof table.word.$inferInsert> = {
+		grammar,
+		manualFields: [...manual],
+		prefixId: await prefixIdOf(db, w.pos, grammar)
+	};
 	if (headword && headword !== w.headword) {
 		set.headword = headword;
 		manual.add('headword');
 		set.manualFields = [...manual];
 	}
 	await db.update(table.word).set(set).where(eq(table.word.id, wordId));
+	if (w.pos === 'verb') await refreshGroups(db, userId);
 }
 
 export interface MeaningEdit {
@@ -473,6 +507,7 @@ export async function setDeckStatus(
 			await tx.update(table.card).set({ queuedAt: new Date() }).where(eq(table.card.id, c.id));
 		}
 	});
+	await refreshGroups(db, userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -516,14 +551,17 @@ export async function resyncWord(
 	const fromSource = Object.fromEntries(
 		Object.entries(current.grammar as Grammar).filter(([key]) => !manual.has(key))
 	);
+	const grammar = { ...fromSource, ...kept };
 	await db
 		.update(table.word)
 		.set({
-			grammar: { ...fromSource, ...kept },
+			grammar,
+			prefixId: await prefixIdOf(db, w.pos, grammar),
 			headword: manual.has('headword') ? w.headword : current.headword,
 			sourceSyncedAt: new Date()
 		})
 		.where(eq(table.word.id, wordId));
+	if (w.pos === 'verb') await refreshGroups(db, userId);
 	return { refreshed };
 }
 
