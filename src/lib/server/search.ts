@@ -5,7 +5,7 @@
  * matches inflected forms ("fuhr" finds "fahren"), prefixes and near-misses (trigrams).
  * English matching looks for the term as a whole word in the glosses.
  */
-import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import * as table from './db/schema.js';
 import type { Db } from './dictionary/store.js';
 import { lookupGerman, SourceUnavailableError } from './dictionary/lookup.js';
@@ -213,7 +213,14 @@ export async function dictionaryHits(
 			.select({ senseId: table.meaning.dictSenseId })
 			.from(table.meaning)
 			.innerJoin(table.dictSense, eq(table.dictSense.id, table.meaning.dictSenseId))
-			.where(and(eq(table.meaning.userId, userId), inArray(table.dictSense.dictWordId, ids)))
+			// A starter-set meaning not yet in the deck can still be added from here.
+			.where(
+				and(
+					eq(table.meaning.userId, userId),
+					inArray(table.dictSense.dictWordId, ids),
+					ne(table.meaning.deckStatus, 'not_in_deck')
+				)
+			)
 	]);
 	const byId = new Map(words.map((w) => [w.id, w]));
 	const exampleBySense = new Map(examples.map((e) => [e.senseId, e]));

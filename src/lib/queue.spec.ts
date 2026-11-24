@@ -249,4 +249,38 @@ describe('filters', () => {
 	it('shows group cards only English → German', () => {
 		expect(queue({ cards, selection: cram, direction: 'de_en' })).toEqual([1, 2, 3]);
 	});
+
+	it('matches a group card by the parts of speech of its in-deck members', () => {
+		const mixed = [...cards, card(5, { kind: 'group', pos: null, posList: ['verb', 'noun'] })];
+		expect(queue({ cards: mixed, selection: cram, filter: { tags: [], pos: 'verb' } })).toEqual([
+			2, 3, 5
+		]);
+	});
+});
+
+describe('group cards', () => {
+	it('join the new-card queue when their group qualifies, within the daily limit', () => {
+		const cards = [
+			card(1),
+			card(2),
+			// Qualified this morning: queued after the older meaning cards.
+			card(3, { kind: 'group', pos: null, queuedAt: at('2026-11-18T07:00:00Z') }),
+			// Not qualified yet: no queued date.
+			card(4, { kind: 'group', pos: null, queuedAt: null })
+		];
+		expect(queue({ cards, selection: { type: 'new' } })).toEqual([1, 2, 3]);
+		expect(queue({ cards, selection: { type: 'new' }, dailyNewLimit: 2 })).toEqual([1, 2]);
+	});
+
+	it('come up for review like any other card once seen', () => {
+		const cards = [card(3, { kind: 'group', pos: null })];
+		const events = [ev(3, '2026-11-17T09:00:00Z')];
+		expect(
+			queue({
+				cards,
+				events,
+				selection: { type: 'review', anchor: { kind: 'last7' }, order: 'oldest_first' }
+			})
+		).toEqual([3]);
+	});
 });

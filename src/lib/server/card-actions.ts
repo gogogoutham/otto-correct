@@ -27,7 +27,15 @@ export const cardActions = {
 
 	flag: async ({ request, locals }: RequestEvent) => {
 		const form = await request.formData();
-		await setFlag(db, userId(locals), int(form, 'meaningId'), text(form, 'flagged') === 'true');
+		const flagged = text(form, 'flagged') === 'true';
+		const uid = userId(locals);
+		// Group cards have no meaning: they are flagged by card.
+		if (text(form, 'cardId'))
+			await db
+				.update(table.card)
+				.set({ flagged })
+				.where(and(eq(table.card.id, int(form, 'cardId')), eq(table.card.userId, uid)));
+		else await setFlag(db, uid, int(form, 'meaningId'), flagged);
 	},
 
 	/** Marks the current meaning known: it leaves all scheduled sessions. */

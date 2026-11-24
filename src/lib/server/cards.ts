@@ -4,6 +4,7 @@
  */
 import type { Db } from './dictionary/store.js';
 import { getWordPage, wordIdOfMeaning } from './collection.js';
+import { groupsOfMeanings, type GroupKind } from './groups.js';
 import { buildCardBack, cleanGloss, type CardBack } from '#lib/card-back.js';
 import { posLabel, type Grammar, type PartOfSpeech } from '#lib/grammar.js';
 
@@ -41,11 +42,14 @@ export interface CardView {
 	examples: { german: string; english: string | null; source: string }[];
 	others: OtherMeaning[];
 	homographs: Homograph[];
+	/** Groups this meaning is in: "other ways to say 'to (a place)'". */
+	groups: { id: number; kind: GroupKind; title: string }[];
 }
 
 export async function getCard(db: Db, userId: string, meaningId: number): Promise<CardView> {
 	const page = await getWordPage(db, userId, await wordIdOfMeaning(db, userId, meaningId));
 	const m = page.meanings.find((x) => x.id === meaningId)!;
+	const groups = (await groupsOfMeanings(db, userId, [meaningId])).get(meaningId) ?? [];
 	const word = {
 		headword: page.word.headword,
 		pos: page.word.pos,
@@ -95,6 +99,7 @@ export async function getCard(db: Db, userId: string, meaningId: number): Promis
 				gloss: h.firstGloss ? cleanGloss(h.firstGloss) : null,
 				wordId: null
 			}))
-		]
+		],
+		groups
 	};
 }

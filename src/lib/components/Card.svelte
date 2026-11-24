@@ -23,6 +23,10 @@
 	);
 	const wordHref = (id: number) =>
 		resolve(`/words/[id]?return=${encodeURIComponent(returnTo)}`, { id: String(id) });
+	const groupHref = (id: number) =>
+		resolve(`/groups/[id]?return=${encodeURIComponent(returnTo)}`, { id: String(id) });
+	const groupLink = (g: { kind: string; title: string }) =>
+		g.kind === 'contrast' ? `Other ways to say “${g.title}”` : g.title;
 	const searchHref = (q: string) => resolve(`/search?q=${encodeURIComponent(q)}`);
 	const others = $derived(card.others.filter((o) => o.status !== 'not_in_deck'));
 	const unseen = $derived(card.others.filter((o) => o.status === 'not_in_deck'));
@@ -148,6 +152,16 @@
 						</a>{#if !h.wordId}<span class="text-xs text-stone-400"> (not in your words)</span>{/if}
 					{/each}
 				</p>
+			{/if}
+
+			{#if card.groups.length}
+				<ul class="flex flex-col gap-1 text-sm">
+					{#each card.groups as g (g.id)}
+						<li>
+							<a href={groupHref(g.id)} class="text-blue-700 hover:underline">{groupLink(g)} →</a>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		</div>
 	{/if}

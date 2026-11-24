@@ -26,7 +26,8 @@
 		"wordbank:download": "scripts/wordbank/download.sh",
 		"wordbank:build": "tsx scripts/wordbank/build.ts",
 		"wordbank:load": "tsx scripts/wordbank/load.ts",
-		"cards:samples": "tsx scripts/card-back-samples.ts"
+		"cards:samples": "tsx scripts/card-back-samples.ts",
+		"starter:review": "tsx scripts/starter-review.ts > docs/starter-set.md"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

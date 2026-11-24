@@ -54,14 +54,14 @@ export async function updateSettings(
 }
 
 export interface StudyData {
-	cards: (QueueCard & { meaningId: number | null })[];
+	cards: (QueueCard & { meaningId: number | null; groupId: number | null })[];
 	events: QueueEvent[];
 	settings: StudySettings;
 }
 
 /** Everything the queue builder needs, for one user. */
 export async function loadStudyData(db: Db, userId: string): Promise<StudyData> {
-	const [rows, events, settings] = await Promise.all([
+	const [rows, groupRows, events, settings] = await Promise.all([
 		db
 			.select({
 				id: table.card.id,
@@ -80,6 +80,19 @@ export async function loadStudyData(db: Db, userId: string): Promise<StudyData> 
 			.leftJoin(table.tag, eq(table.tag.id, table.meaningTag.tagId))
 			.where(eq(table.card.userId, userId))
 			.groupBy(table.card.id, table.meaning.id, table.word.id),
+		// Group cards carry the tags and parts of speech of their in-deck members.
+		db.execute(sql`
+			select c.id, c.group_id as "groupId", c.queued_at as "queuedAt",
+			       coalesce(array_agg(distinct t.name) filter (where t.name is not null), '{}') as tags,
+			       coalesce(array_agg(distinct w.pos::text) filter (where w.pos is not null), '{}') as "posList"
+			from card c
+			left join group_member gm on gm.group_id = c.group_id
+			left join meaning m on m.id = gm.meaning_id and m.deck_status in ('studying', 'known')
+			left join word w on w.id = m.word_id
+			left join meaning_tag mt on mt.meaning_id = m.id
+			left join tag t on t.id = mt.tag_id
+			where c.user_id = ${userId} and c.group_id is not null
+			group by c.id`),
 		db
 			.select({
 				cardId: table.reviewEvent.cardId,
@@ -90,8 +103,28 @@ export async function loadStudyData(db: Db, userId: string): Promise<StudyData> 
 			.where(eq(table.reviewEvent.userId, userId)),
 		getSettings(db, userId)
 	]);
+	const groups = groupRows as {
+		id: number;
+		groupId: number;
+		queuedAt: Date | string | null;
+		tags: string[];
+		posList: string[];
+	}[];
 	return {
-		cards: rows.map((r) => ({ ...r, kind: 'meaning' as const })),
+		cards: [
+			...rows.map((r) => ({ ...r, groupId: null, kind: 'meaning' as const })),
+			...groups.map((g) => ({
+				id: g.id,
+				meaningId: null,
+				groupId: g.groupId,
+				kind: 'group' as const,
+				status: 'studying' as const,
+				queuedAt: g.queuedAt ? new Date(g.queuedAt) : null,
+				tags: g.tags,
+				pos: null,
+				posList: g.posList
+			}))
+		],
 		events,
 		settings
 	};
@@ -160,8 +193,8 @@ export function homeCounts(data: StudyData, now = new Date()): HomeCounts {
 			'en_de',
 			now
 		).length,
-		studying: data.cards.filter((c) => c.status === 'studying').length,
-		known: data.cards.filter((c) => c.status === 'known').length,
+		studying: data.cards.filter((c) => c.kind === 'meaning' && c.status === 'studying').length,
+		known: data.cards.filter((c) => c.kind === 'meaning' && c.status === 'known').length,
 		reviewedToday: [...history.values()].filter((h) => h.today.size > 0).length
 	};
 }

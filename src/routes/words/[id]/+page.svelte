@@ -150,6 +150,45 @@
 					</form>
 				</div>
 
+				{#if data.prefixMeanings?.options.length}
+					<form
+						method="POST"
+						action={actionUrl(page.url.search, 'prefixMeaning')}
+						use:enhance
+						class="flex flex-wrap items-center gap-2 text-sm"
+					>
+						<input type="hidden" name="meaningId" value={m.id} />
+						<label for="prefix-meaning-{m.id}" class="text-stone-500">
+							{data.prefixMeanings.prefix}- here means
+						</label>
+						<select
+							id="prefix-meaning-{m.id}"
+							name="groupId"
+							class="rounded-lg border border-stone-300 px-2 py-1"
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+						>
+							<option value="">not set</option>
+							{#each data.prefixMeanings.options as o (o.id)}
+								<option value={o.id} selected={data.prefixMeanings.byMeaning[m.id] === o.id}>
+									{o.label}
+								</option>
+							{/each}
+						</select>
+					</form>
+				{/if}
+
+				{#if data.groupsByMeaning[m.id]?.length}
+					<p class="text-sm">
+						<span class="text-stone-500">In groups:</span>
+						{#each data.groupsByMeaning[m.id] as g, i (g.id)}{#if i},&#32;{/if}<a
+								href={resolve('/groups/[id]', { id: String(g.id) })}
+								class="text-blue-700 hover:underline"
+							>
+								{g.title}
+							</a>{/each}
+					</p>
+				{/if}
+
 				{#if m.tags.length}
 					<ul class="flex flex-wrap gap-1">
 						{#each m.tags as t (t)}

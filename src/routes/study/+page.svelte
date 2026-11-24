@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Card from '#lib/components/Card.svelte';
+	import GroupCard from '#lib/components/GroupCard.svelte';
 	import { PARTS_OF_SPEECH } from '#lib/grammar.js';
 	import { anchorParams, sessionTitle } from '#lib/session-params.js';
 	import { actionUrl } from '#lib/url.js';
@@ -94,9 +95,13 @@
 		</form>
 	{/if}
 
-	{#if data.card && data.cardId}
+	{#if (data.card || data.group) && data.cardId}
 		<p class="text-sm text-stone-500">{data.left} left</p>
-		<Card card={data.card} direction={s.direction} {flipped} returnTo={here} />
+		{#if data.card}
+			<Card card={data.card} direction={s.direction} {flipped} returnTo={here} />
+		{:else if data.group}
+			<GroupCard group={data.group} {flipped} returnTo={here} />
+		{/if}
 
 		{#if !flipped}
 			<button
@@ -131,24 +136,39 @@
 
 		<div class="flex flex-wrap items-center gap-4 text-sm">
 			<form method="POST" action={actionUrl(page.url.search, 'flag')} use:enhance>
-				<input type="hidden" name="meaningId" value={data.card.meaningId} />
-				<input type="hidden" name="flagged" value={String(!data.card.flagged)} />
+				{#if data.card}
+					<input type="hidden" name="meaningId" value={data.card.meaningId} />
+				{:else}
+					<input type="hidden" name="cardId" value={data.cardId} />
+				{/if}
+				<input type="hidden" name="flagged" value={String(!data.flagged)} />
 				<button class="text-blue-700 hover:underline">
-					{data.card.flagged ? '⚑ Unflag' : '⚐ Flag'}
+					{data.flagged ? '⚑ Unflag' : '⚐ Flag'}
 				</button>
 			</form>
-			<form method="POST" action={actionUrl(page.url.search, 'known')} use:enhance>
-				<input type="hidden" name="meaningId" value={data.card.meaningId} />
-				<button class="text-blue-700 hover:underline">Mark known</button>
-			</form>
-			<a
-				href={resolve(`/words/[id]?return=${encodeURIComponent(here)}`, {
-					id: String(data.card.wordId)
-				})}
-				class="text-blue-700 hover:underline"
-			>
-				Edit word or meaning
-			</a>
+			{#if data.card}
+				<form method="POST" action={actionUrl(page.url.search, 'known')} use:enhance>
+					<input type="hidden" name="meaningId" value={data.card.meaningId} />
+					<button class="text-blue-700 hover:underline">Mark known</button>
+				</form>
+				<a
+					href={resolve(`/words/[id]?return=${encodeURIComponent(here)}`, {
+						id: String(data.card.wordId)
+					})}
+					class="text-blue-700 hover:underline"
+				>
+					Edit word or meaning
+				</a>
+			{:else if data.group}
+				<a
+					href={resolve(`/groups/[id]?return=${encodeURIComponent(here)}`, {
+						id: String(data.group.id)
+					})}
+					class="text-blue-700 hover:underline"
+				>
+					Edit group
+				</a>
+			{/if}
 			<a href={resolve('/')} class="ml-auto text-stone-500 hover:underline">Pause</a>
 		</div>
 	{:else}

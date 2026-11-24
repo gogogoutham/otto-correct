@@ -27,6 +27,56 @@
 	{:else}
 		{#if form?.message}<p class="text-red-700" role="alert">{form.message}</p>{/if}
 
+		{#if data.prefix}
+			<p class="text-sm">
+				<a
+					href={resolve('/prefixes/[prefix]', { prefix: data.prefix.prefix })}
+					class="text-blue-700 hover:underline"
+				>
+					The prefix {data.prefix.prefix}- →
+				</a>
+				<span class="text-stone-500">({data.prefix.type})</span>
+			</p>
+		{/if}
+
+		{#each data.groups as g (g.id)}
+			<section class="flex flex-col gap-2 rounded-xl border border-stone-200 p-4">
+				<h2 class="flex flex-wrap items-baseline justify-between gap-2">
+					<a
+						href={resolve('/groups/[id]', { id: String(g.id) })}
+						class="font-medium hover:underline"
+					>
+						{g.title}
+					</a>
+					<span class="text-xs text-stone-500">
+						{g.kind === 'contrast' ? 'contrast group' : g.kind.replace('_', ' ')}
+					</span>
+				</h2>
+				<table class="w-full text-left text-sm">
+					<tbody>
+						{#each g.members as m (m.id)}
+							<tr
+								class="border-t border-stone-100 align-top {m.deckStatus === 'not_in_deck'
+									? 'text-stone-400'
+									: ''}"
+							>
+								<td class="py-1 pr-3 font-medium">
+									<a
+										href={resolve('/words/[id]', { id: String(m.wordId) })}
+										class="hover:underline"
+									>
+										{m.display}
+									</a>
+								</td>
+								<td class="py-1 pr-3">{m.rule ?? m.glosses.join('; ')}</td>
+								<td class="py-1 italic">{m.example ?? ''}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</section>
+		{/each}
+
 		{#if collection.length}
 			<section>
 				<h2 class="mb-2 text-sm font-medium tracking-wide text-stone-500 uppercase">

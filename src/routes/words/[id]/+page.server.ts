@@ -17,6 +17,7 @@ import {
 	type DeckStatus
 } from '#lib/server/collection.js';
 import { int, senseSelections, text, userId } from '#lib/server/forms.js';
+import { groupsOfMeanings, prefixMeaningsForWord, setPrefixMeaning } from '#lib/server/groups.js';
 import { GRAMMAR_FIELDS, grammarFromForm, meaningFields } from '#lib/grammar.js';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -41,11 +42,24 @@ const NEW_STATUSES = ['studying', 'known'] as const;
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const uid = userId(locals);
-	const [page, tags] = await Promise.all([
-		guard(() => getWordPage(db, uid, wordId(params.id))),
-		listTags(db, uid)
+	const id = wordId(params.id);
+	const [page, tags, prefixMeanings] = await Promise.all([
+		guard(() => getWordPage(db, uid, id)),
+		listTags(db, uid),
+		prefixMeaningsForWord(db, uid, id)
 	]);
-	return { ...page, tags, added: Number(url.searchParams.get('added')) || 0 };
+	const groups = await groupsOfMeanings(
+		db,
+		uid,
+		page.meanings.map((m) => m.id)
+	);
+	return {
+		...page,
+		tags,
+		prefixMeanings,
+		groupsByMeaning: Object.fromEntries(groups),
+		added: Number(url.searchParams.get('added')) || 0
+	};
 };
 
 export const actions: Actions = {
@@ -85,6 +99,15 @@ export const actions: Actions = {
 			await setMeaningTags(db, uid, meaningId, parseTagList(text(form, 'tags')));
 		});
 		return { saved: meaningId };
+	},
+
+	/** The prefix meaning a verb meaning uses: adds it to that prefix-meaning group. */
+	prefixMeaning: async ({ request, locals }) => {
+		const form = await request.formData();
+		const group = text(form, 'groupId');
+		await guard(() =>
+			setPrefixMeaning(db, userId(locals), int(form, 'meaningId'), group ? Number(group) : null)
+		);
 	},
 
 	status: async ({ request, locals }) => {
