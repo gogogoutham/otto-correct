@@ -21,6 +21,18 @@ const find = (word: string, pos: string) =>
 	parsed.filter((p) => p.headword === word && p.pos === pos);
 
 describe('parseEntry', () => {
+	it('keeps a normal plural when only one sense is plural-only', () => {
+		const [apfel] = find('Apfel', 'noun');
+		expect(apfel.grammar).toMatchObject({ genders: ['m'], plurals: ['Äpfel'] });
+		expect(apfel.grammar).not.toHaveProperty('pluralOnly');
+	});
+
+	it('marks nouns Wiktionary lists with no plural', () => {
+		const [heimweh] = find('Heimweh', 'noun');
+		expect(heimweh.grammar).toMatchObject({ genders: ['n'], noPlural: true });
+		expect(heimweh.grammar).not.toHaveProperty('plurals');
+	});
+
 	it('reads verb principal parts and auxiliaries', () => {
 		const [fahren] = find('fahren', 'verb');
 		expect(fahren.grammar).toMatchObject({

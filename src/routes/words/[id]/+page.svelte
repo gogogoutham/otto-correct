@@ -15,7 +15,6 @@
 	import { meaningUsage } from '#lib/card-back.js';
 	import { page } from '$app/state';
 	import type { DictionaryHit } from '#lib/server/search.js';
-	import type { PathnameWithSearchOrHash } from '$app/types';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -23,11 +22,12 @@
 	const grammar = $derived(w.grammar as Grammar);
 	const summary = $derived(grammarSummary(w.pos, grammar, w.headword));
 	const fields = $derived(GRAMMAR_FIELDS[w.pos]);
-	/** Where to go back to when this page was opened from a practice session. */
+	/** Where to go back to when this page was opened from a study session. */
 	const returnTo = $derived.by(() => {
 		const r = page.url.searchParams.get('return') ?? '';
-		return r.startsWith('/practice') || r.startsWith('/cards/')
-			? (r as PathnameWithSearchOrHash)
+		return r.startsWith('/study') || r.startsWith('/cards/')
+			? // One member of the union: resolve() can't take the whole union at once.
+				(r as `/study?${string}`)
 			: null;
 	});
 

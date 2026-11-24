@@ -32,6 +32,10 @@
 					class="w-full rounded-lg border border-stone-300 px-3 py-1.5"
 				/>
 			</form>
+			<a href={resolve('/review')} class="text-sm text-stone-600 hover:text-stone-900">Review</a>
+			<a href={resolve('/settings')} class="text-sm text-stone-600 hover:text-stone-900">
+				Settings
+			</a>
 			<form method="POST" action="/logout">
 				<button class="text-sm text-stone-600 hover:text-stone-900">Log out</button>
 			</form>

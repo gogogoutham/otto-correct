@@ -20,7 +20,8 @@ import { fakeKaikki } from './dictionary/fixtures/fake-kaikki.js';
 import { lookupGerman } from './dictionary/lookup.js';
 import type { Db } from './dictionary/store.js';
 import { search } from './search.js';
-import { getCard, practiceQueue } from './cards.js';
+import { getCard } from './cards.js';
+import { homeCounts, loadStudyData, queueFor, recordReview } from './study.js';
 
 const url = process.env.DATABASE_URL;
 
@@ -209,13 +210,74 @@ describe.skipIf(!url)('collection (database)', () => {
 			expect(card.others.every((o) => o.status === 'not_in_deck')).toBe(true);
 		});
 
-		it('builds the practice queue from studying meanings, filtered by tag and part of speech', async () => {
-			const all = await practiceQueue(db, userId, { tags: [], pos: null });
-			const travel = await practiceQueue(db, userId, { tags: ['travel'], pos: null });
-			const nouns = await practiceQueue(db, userId, { tags: [], pos: 'noun' });
+		it('loads studying cards with tags and filters them by tag and part of speech', async () => {
+			const data = await loadStudyData(db, userId);
+			const cram = { type: 'cram', includeKnown: false, order: 'oldest_first' } as const;
+			const all = queueFor(data, cram, { tags: [], pos: null }, 'en_de');
+			const travel = queueFor(data, cram, { tags: ['travel'], pos: null }, 'en_de');
+			const nouns = queueFor(data, cram, { tags: [], pos: 'noun' }, 'en_de');
 			expect(travel.length).toBe(2);
 			expect(all.length).toBeGreaterThan(travel.length);
 			expect(nouns).toHaveLength(1);
+		});
+	});
+
+	describe('study sessions', () => {
+		it('logs reviews, which move a card from new to review and out of today', async () => {
+			const before = await loadStudyData(db, userId);
+			const fresh = queueFor(before, { type: 'new' }, { tags: [], pos: null }, 'en_de');
+			expect(fresh.length).toBeGreaterThan(0);
+			const cardId = fresh[0];
+			expect(homeCounts(before).newToday).toBe(fresh.length);
+
+			await recordReview(db, userId, cardId, 'en_de', 'new');
+			const after = await loadStudyData(db, userId);
+			expect(after.events.filter((e) => e.cardId === cardId)).toHaveLength(1);
+			expect(queueFor(after, { type: 'new' }, { tags: [], pos: null }, 'en_de')).not.toContain(
+				cardId
+			);
+			const counts = homeCounts(after);
+			expect(counts.reviewedToday).toBe(1);
+			// Seen once in a new session: it counts as never revisited, but not before tomorrow.
+			const tomorrow = new Date(Date.now() + 36 * 3600_000);
+			const never = { kind: 'never_revisited' } as const;
+			const review = { type: 'review', anchor: never, order: 'oldest_first' } as const;
+			const filter = { tags: [], pos: null };
+			expect(queueFor(after, review, filter, 'en_de')).not.toContain(cardId);
+			expect(queueFor(after, review, filter, 'en_de', tomorrow)).toContain(cardId);
+
+			const [card] = await db
+				.select({ last: table.card.lastReviewedAt })
+				.from(table.card)
+				.where(eq(table.card.id, cardId));
+			expect(card.last).not.toBeNull();
+		});
+
+		it("ignores reviews of another user's card", async () => {
+			const [other] = await db
+				.insert(table.user)
+				.values({ username: `test-${randomUUID()}`, passwordHash: 'x' })
+				.returning({ id: table.user.id });
+			try {
+				const [{ id: cardId }] = await db
+					.select({ id: table.card.id })
+					.from(table.card)
+					.where(eq(table.card.userId, userId))
+					.limit(1);
+				await recordReview(db, other.id, cardId, 'en_de', 'cram');
+				expect((await loadStudyData(db, other.id)).events).toEqual([]);
+			} finally {
+				await db.delete(table.user).where(eq(table.user.id, other.id));
+			}
+		});
+
+		it('reads settings, starting from the defaults', async () => {
+			const data = await loadStudyData(db, userId);
+			expect(data.settings).toEqual({
+				timeZone: 'UTC',
+				dailyNewLimit: 6,
+				reviewOrder: 'oldest_first'
+			});
 		});
 	});
 });
